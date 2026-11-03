@@ -19,6 +19,8 @@ export async function users(ctx) {
   const [id] = ctx.sub;
   if (!id) return list(ctx);
   if (id === 'new') return add(ctx);
+  // Their settings: LCARS's own settings page, for them (official mypreferencesmenu?userId=).
+  if (ctx.sub[1] === 'settings') return import('../views/settings.js').then(m => m.settings({ ...ctx, params: { user: id } }));
   return edit(ctx, id);
 }
 
@@ -52,22 +54,27 @@ async function add(ctx) {
   const { api, signal } = ctx;
   ctx.setTitle('New user');
   ctx.setParent('#/admin/users');
-  const folders = (await api.get('/Library/MediaFolders', { isHidden: false }, { signal })).Items || [];
+  const [folders, channels] = await Promise.all([
+    api.get('/Library/MediaFolders', { isHidden: false }, { signal }).then(r => r.Items || []),
+    api.get('/Channels', undefined, { signal }).then(r => r.Items || []).catch(() => []),
+  ]);
   const name = h('input.inp', { attrs: { autocomplete: 'off', required: true, spellcheck: 'false' } });
   const pw = h('input.inp', { type: 'password', attrs: { autocomplete: 'new-password' } });
   const pw2 = h('input.inp', { type: 'password', attrs: { autocomplete: 'new-password' } });
-  let all = true;
-  const chosen = new Set();
-  const access = h('div');
-  function drawAccess() {
-    fill(access, h('div.eng-allor',
-      h('div.eng-allor-h', h('button.toggle', { type: 'button', class: all ? 'on' : '', onclick: () => { all = !all; drawAccess(); } }, all ? 'On' : 'Off'), h('span', 'All libraries')),
-      h('div.eng-checks', { class: all ? 'off' : '' }, folders.map(fo => h('button.eng-check', {
-        type: 'button', class: all || chosen.has(fo.Id) ? 'on' : '', disabled: all,
-        onclick: () => { if (chosen.has(fo.Id)) chosen.delete(fo.Id); else chosen.add(fo.Id); drawAccess(); },
-      }, fo.Name)))));
+  // "All" or a chosen few, for libraries and (when the server has any) channels.
+  function picker(items, allLabel) {
+    const st = { all: true, chosen: new Set(), el: h('div') };
+    const draw = () => fill(st.el, h('div.eng-allor',
+      h('div.eng-allor-h', h('button.toggle', { type: 'button', class: st.all ? 'on' : '', onclick: () => { st.all = !st.all; draw(); } }, st.all ? 'On' : 'Off'), h('span', allLabel)),
+      h('div.eng-checks', { class: st.all ? 'off' : '' }, items.map(it => h('button.eng-check', {
+        type: 'button', class: st.all || st.chosen.has(it.Id) ? 'on' : '', disabled: st.all,
+        onclick: () => { if (st.chosen.has(it.Id)) st.chosen.delete(it.Id); else st.chosen.add(it.Id); draw(); },
+      }, it.Name)))));
+    draw();
+    return st;
   }
-  drawAccess();
+  const libs = picker(folders, 'All libraries');
+  const chans = channels.length ? picker(channels, 'All channels') : null;
   const msg = h('p.msg', { attrs: { role: 'status' } });
   const form = h('form.set-form', {
     onsubmit: async e => {
@@ -79,7 +86,8 @@ async function add(ctx) {
       msg.textContent = 'Creating…';
       try {
         const u = await api.post('/Users/New', { Name: n, Password: pw.value || undefined });
-        await api.post(`/Users/${u.Id}/Policy`, { ...u.Policy, EnableAllFolders: all, EnabledFolders: all ? [] : [...chosen] });
+        await api.post(`/Users/${u.Id}/Policy`, { ...u.Policy, EnableAllFolders: libs.all, EnabledFolders: libs.all ? [] : [...libs.chosen],
+          ...(chans ? { EnableAllChannels: chans.all, EnabledChannels: chans.all ? [] : [...chans.chosen] } : {}) });
         toast('User created', n, 'sky');
         location.hash = `#/admin/users/${u.Id}`;
       } catch (err) {
@@ -89,7 +97,8 @@ async function add(ctx) {
     },
   },
   row('Name', name), row('Password', pw, 'Optional: a user without one signs in with an empty password'), row('Confirm password', pw2),
-  h('h3.set-h', 'Library access'), access,
+  h('h3.set-h', 'Library access'), libs.el,
+  chans ? [h('h3.set-h', 'Channel access'), chans.el] : null,
   h('div.actions', btn('Create user', null, { type: 'submit', color: 'orange' }), btn('Cancel', () => { location.hash = '#/admin/users'; }, { color: 'lilac', ghost: true })),
   msg);
   setTimeout(() => name.focus(), 0);
@@ -192,6 +201,7 @@ async function edit(ctx, userId) {
     row('Hidden from the sign-in screen', t('IsHidden'), 'They type their name to sign in'),
     row('Allow remote connections', t('EnableRemoteAccess'), 'From outside the server’s LAN'),
     row('Change their own settings', t('EnableUserPreferenceAccess'), 'Password, home screen and display preferences'),
+    row('Their settings', btn('Edit their settings', () => { location.hash = `#/admin/users/${user.Id}/settings`; }, { small: true, color: 'lilac' }), 'Home screen, display, playback and subtitle preferences'),
     providerRow('Authentication provider', 'AuthenticationProviderId', authProviders),
     providerRow('Password reset provider', 'PasswordResetProviderId', resetProviders),
     row('Failed sign-ins before lockout', fo.num(P('LoginAttemptsBeforeLockout'), { min: -1, zero: 0, placeholder: 'Default' }), 'Empty: the default (3, or 5 for administrators); −1: never lock'),
@@ -208,7 +218,8 @@ async function edit(ctx, userId) {
     row('SyncPlay', fo.select(P('SyncPlayAccess'), SYNCPLAY)),
     h('h3.set-h', 'Management'),
     row('Delete media', t('EnableContentDeletion'), 'From every library; off to choose below'),
-    row('Delete from these libraries', fo.checklist(P('EnableContentDeletionFromFolders'), folderItems, { disabledBy: P('EnableContentDeletion') })),
+    row(channels.length ? 'Delete from these libraries and channels' : 'Delete from these libraries',
+      fo.checklist(P('EnableContentDeletionFromFolders'), [...folderItems, ...channels.map(c => [c.Name, c.Id])], { disabledBy: P('EnableContentDeletion') })),
     row('Download media', t('EnableContentDownloading')),
     row('Manage collections', t('EnableCollectionManagement')),
     row('Manage subtitles', t('EnableSubtitleManagement')),

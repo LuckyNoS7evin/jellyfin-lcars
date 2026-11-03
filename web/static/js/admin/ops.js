@@ -168,6 +168,15 @@ async function activity(ctx) {
   const moreEl = h('div.actions');
   const countEl = h('span.eng-ro');
   let items = [], total = 0, loadingMore = false, token = 0;
+  // Who each entry is about, by user id (official activity's User column).
+  const people = new Map();
+  api.get('/Users', undefined, { signal }).then(us => { for (const u of us) people.set(u.Id.replace(/-/g, ''), u); if (items.length) fill(listEl, items.map(entry)); }).catch(() => {});
+  const who = e => {
+    const u = e.UserId && people.get(String(e.UserId).replace(/-/g, ''));
+    if (!u) return null;
+    return h('a.eng-actrow-u', { href: `#/admin/users/${u.Id}`, title: u.Name },
+      u.PrimaryImageTag ? h('img', { src: api.url(`/Users/${u.Id}/Images/Primary`, { tag: u.PrimaryImageTag, height: 48, quality: 90 }), alt: '' }) : h('span', u.Name[0]), h('b', u.Name));
+  };
 
   const query = startIndex => {
     const q = { startIndex, limit: PAGE, sortBy: 'DateCreated', sortOrder: 'Descending' };
@@ -180,8 +189,9 @@ async function activity(ctx) {
   const entry = e => h('div.eng-actrow', { class: `sev-${(e.Severity || 'Information').toLowerCase()}` },
     h('span.eng-actrow-t', { title: new Date(e.Date).toLocaleString() }, new Date(e.Date).toLocaleString(undefined, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })),
     h('div.eng-actrow-b', h('span.eng-act-n', e.Name), e.ShortOverview ? h('span.eng-act-o', e.ShortOverview) : null,
+      e.ItemId ? h('a.eng-actrow-i', { href: `#/item/${String(e.ItemId).replace(/-/g, '')}` }, 'Open the item') : null,
       e.Overview && e.Overview !== e.ShortOverview ? h('details', h('summary', 'Details'), h('pre', e.Overview)) : null),
-    h('span.eng-actrow-k', [e.Severity && e.Severity !== 'Information' ? tag(e.Severity, e.Severity === 'Warning' ? 'peach' : 'red') : null, h('span', e.Type)]));
+    h('span.eng-actrow-k', [who(e), e.Severity && e.Severity !== 'Information' ? tag(e.Severity, e.Severity === 'Warning' ? 'peach' : 'red') : null, h('span', e.Type)]));
   async function load(reset = true) {
     const my = ++token;
     if (reset) { items = []; fill(listEl, loading('Reading the log')); }

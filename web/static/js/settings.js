@@ -14,16 +14,18 @@ export const SUBTITLE_DEFAULTS = {
 };
 
 export class UserSettings {
-  constructor(api) {
+  // userId: whose settings (an admin may edit another user's; their device settings stay theirs).
+  constructor(api, userId = api.userId) {
     this.api = api;
+    this.userId = userId;
     this.me = null;
     this.dp = null; // the whole DisplayPreferences object
   }
 
   async load() {
     const [me, dp] = await Promise.all([
-      this.api.me(),
-      this.api.get('/DisplayPreferences/usersettings', { userId: this.api.userId, client: 'emby' }).catch(() => null),
+      this.userId === this.api.userId ? this.api.me() : this.api.get(`/Users/${this.userId}`),
+      this.api.get('/DisplayPreferences/usersettings', { userId: this.userId, client: 'emby' }).catch(() => null),
     ]);
     this.me = me;
     this.dp = dp || { Id: 'usersettings', Client: 'emby', CustomPrefs: {} };
@@ -50,7 +52,7 @@ export class UserSettings {
 
   /** Read-modify-write so changes made by another client meanwhile aren't lost. */
   async setPrefs(patch) {
-    const q = { userId: this.api.userId, client: 'emby' };
+    const q = { userId: this.userId, client: 'emby' };
     let fresh;
     try { fresh = await this.api.get('/DisplayPreferences/usersettings', q); } catch { fresh = this.dp; }
     fresh.CustomPrefs ||= {};
@@ -64,7 +66,7 @@ export class UserSettings {
 
   async saveConfig(patch) {
     const cfg = { ...this.config, ...patch };
-    await this.api.post('/Users/Configuration', cfg, { userId: this.api.userId });
+    await this.api.post('/Users/Configuration', cfg, { userId: this.userId });
     this.me.Configuration = cfg;
   }
 

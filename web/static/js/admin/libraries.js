@@ -23,10 +23,11 @@ export async function libraries(ctx) {
   if (id === 'display') return displayPage(ctx);
   if (id === 'metadata') return metadataPage(ctx);
   if (id === 'nfo') return nfoPage(ctx);
+  if (id === 'manager') return import('./manager.js').then(m => m.manager(ctx, subTabs('manager')));
   return editLibrary(ctx, id);
 }
 
-const subTabs = cur => h('div.tabs.eng-subtabs', [['', 'Libraries'], ['display', 'Display'], ['metadata', 'Metadata'], ['nfo', 'NFO']]
+const subTabs = cur => h('div.tabs.eng-subtabs', [['', 'Libraries'], ['display', 'Display'], ['metadata', 'Metadata'], ['nfo', 'NFO'], ['manager', 'Metadata manager']]
   .map(([k, l]) => h('a.tab', { href: `#/admin/libraries${k ? `/${k}` : ''}`, class: k === cur ? 'on' : '' }, l)));
 
 // ---- list ---------------------------------------------------------------------------------------
@@ -73,6 +74,7 @@ async function list(ctx) {
           btn('Edit', () => { location.hash = `#/admin/libraries/${lib.ItemId}`; }, { small: true, color: 'orange' }),
           btn('Scan', () => refreshDialog(ctx, [{ Id: lib.ItemId, Name: lib.Name, Type: 'CollectionFolder' }]), { small: true, color: 'sky', ghost: true }),
           btn('Rename', () => rename(lib), { small: true, color: 'lilac', ghost: true }),
+          btn('Images', () => { location.hash = `#/admin/edit/${lib.ItemId}/images`; }, { small: true, color: 'lilac', ghost: true }),
           btn('Remove', () => remove(lib), { small: true, color: 'red', ghost: true })));
     })) : empty('No libraries yet.'));
   }

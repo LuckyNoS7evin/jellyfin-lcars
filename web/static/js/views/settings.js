@@ -5,7 +5,7 @@ import { CLIENT, VERSION } from '../api.js';
 import { deck, btn, toast, canEditPreferences, squareJpeg } from '../ui.js';
 import { caps } from '../player/profile.js';
 import { subtitleCss } from '../player/engine-web.js';
-import { SUBTITLE_DEFAULTS } from '../settings.js';
+import { SUBTITLE_DEFAULTS, UserSettings } from '../settings.js';
 import { libraryTabs } from './library.js';
 
 const BITRATES = [['Auto (no limit)', 0], ['120 Mbps', 120e6], ['60 Mbps', 60e6], ['40 Mbps', 40e6], ['20 Mbps', 20e6], ['10 Mbps', 10e6], ['8 Mbps', 8e6], ['4 Mbps', 4e6], ['2 Mbps', 2e6], ['1 Mbps', 1e6]];
@@ -35,14 +35,19 @@ const SECTIONS = [
 const DEFAULT_SECTIONS = ['smalllibrarytiles', 'resume', 'resumeaudio', 'resumebook', 'livetv', 'nextup', 'latestmedia', 'none', 'none', 'none'];
 
 export async function settings(ctx) {
-  const { api, app } = ctx;
-  ctx.setTitle('User settings');
-  const us = app.us;
+  const { api, app, params } = ctx;
+  // params.user (from #/admin/users/<id>/settings): an admin editing someone else's settings.
+  // Only what's kept on the server; device settings belong to that user's devices.
+  const other = params?.user && params.user !== api.userId.replace(/-/g, '') ? params.user : null;
+  if (other && !app.me?.Policy?.IsAdministrator) { location.replace('#/settings'); return h('div'); }
+  let us = app.us;
+  if (other) { us = new UserSettings(api, other); await us.load(); ctx.setParent(`#/admin/users/${other}`); }
+  ctx.setTitle(other ? `${us.me.Name}: settings` : 'User settings');
   const [info, cultures, allViews, qcOn] = await Promise.all([
     api.publicInfo(),
     api.get('/Localization/Cultures').catch(() => []),
     // Every library, including ones hidden from My media, for the home settings.
-    api.get('/UserViews', { userId: api.userId, includeHidden: true }).then(r => r.Items).catch(() => app.views),
+    api.get('/UserViews', { userId: us.userId, includeHidden: true }).then(r => r.Items).catch(() => (other ? [] : app.views)),
     api.quickConnectEnabled().catch(() => false),
   ]);
   const cfg = us.config;
@@ -52,13 +57,14 @@ export async function settings(ctx) {
   const saveCfg = patch => us.saveConfig(patch).then(() => saved()).catch(failed);
   // Password and Jellyfin configuration changes need admin or the "allow user preference
   // changes" permission (server RequestHelpers.AssertCanUpdateUser); without it, hide them.
-  const canPrefs = canEditPreferences(us.me);
+  const canPrefs = other ? true : canEditPreferences(us.me);
   const cfgRow = (...a) => (canPrefs ? row(...a) : null);
   const managed = canPrefs ? null : h('p.dlg-note', 'Some settings are managed by your administrator.');
   const savePref = (k, v) => us.setPref(k, v).then(() => saved()).catch(failed);
 
   // ---- controls ---------------------------------------------------------------------------
   const row = (label, control, note) => h('div.set-row', h('div.set-l', h('span', label), note ? h('small', note) : null), h('div.set-c', control));
+  const localRow = (...a) => (other ? null : row(...a));
   const toggle = (on, onchange) => {
     const b = h('button.toggle', { type: 'button', class: on ? 'on' : '', attrs: { role: 'switch', 'aria-checked': String(on) } }, on ? 'On' : 'Off');
     b.addEventListener('click', () => {
@@ -100,7 +106,7 @@ export async function settings(ctx) {
   function drawAvatar() {
     const tag = us.me.PrimaryImageTag;
     fill(avatarEl,
-      tag ? h('img', { src: api.url(`/Users/${api.userId}/Images/Primary`, { tag, height: 160, quality: 90 }), alt: '' }) : h('span.avatar-none', (us.me.Name || '?')[0]),
+      tag ? h('img', { src: api.url(`/Users/${us.userId}/Images/Primary`, { tag, height: 160, quality: 90 }), alt: '' }) : h('span.avatar-none', (us.me.Name || '?')[0]),
       h('div.actions',
         btn(tag ? 'Change picture' : 'Add picture', () => fileIn.click(), { color: 'sky', small: true }),
         tag ? btn('Remove', removeAvatar, { color: 'red', small: true, ghost: true }) : null));
@@ -111,7 +117,7 @@ export async function settings(ctx) {
     if (!file) return;
     try {
       const data = await squareJpeg(file);
-      await api.req('POST', '/UserImage', { query: { userId: api.userId }, raw: { data, type: 'image/jpeg' } });
+      await api.req('POST', '/UserImage', { query: { userId: us.userId }, raw: { data, type: 'image/jpeg' } });
       await us.load();
       drawAvatar();
       saved('Picture updated');
@@ -119,7 +125,7 @@ export async function settings(ctx) {
   });
   async function removeAvatar() {
     try {
-      await api.del('/UserImage', { userId: api.userId });
+      await api.del('/UserImage', { userId: us.userId });
       await us.load();
       drawAvatar();
       saved('Picture removed');
@@ -142,7 +148,7 @@ export async function settings(ctx) {
   const latestExcl = new Set(cfg.LatestItemsExcludes || []);
   async function saveLibs() {
     await saveCfg({ OrderedViews: order.map(v => v.Id), MyMediaExcludes: [...myExcl], LatestItemsExcludes: [...latestExcl] });
-    await app.reloadViews();
+    if (!other) await app.reloadViews();
   }
   function drawLibs() {
     fill(libsEl, h('div.lib-head', h('span', 'Library'), h('span', 'Order'), h('span', 'In My media'), h('span', 'In Latest'), h('span', 'Opens on')),
@@ -210,18 +216,19 @@ export async function settings(ctx) {
         h('span', 'Administrator'), h('span', yes(us.me.Policy?.IsAdministrator)),
         h('span', 'Server'), h('span', `${info.ServerName} · Jellyfin ${info.Version}`)),
       canPrefs ? [h('h3.set-h', 'Picture'), avatarEl, fileIn] : null,
-      qcOn === true ? row('Quick Connect', btn('Authorise a device', () => { location.hash = '#/quickconnect'; }, { color: 'lilac', small: true }),
+      other ? h('p.dlg-note', `Settings ${us.me.Name} keeps on the server. Those kept on each device (bitrate, theme music, subtitle look…) are set on that device.`) : null,
+      !other && qcOn === true ? row('Quick Connect', btn('Authorise a device', () => { location.hash = '#/quickconnect'; }, { color: 'lilac', small: true }),
         'Sign another device in with the code it shows') : null,
-      canPrefs ? pwForm : managed),
+      other ? null : canPrefs ? pwForm : managed),
 
     deck('Display', { color: 'sky', num: 2 },
-      row('Theme songs', toggle(us.themeSongs, on => { us.setLocal('themeSongs', on); saved(); }), 'Play theme music on title pages (this device)'),
-      row('Theme videos', toggle(us.themeVideos, on => { us.setLocal('themeVideos', on); saved(); }), 'Play theme videos behind title pages (this device)'),
-      row('Backdrops', toggle(us.backdrops, on => { us.setLocal('backdrops', on); app.refreshBackdrops(); saved(); }), 'Show backdrops behind library and title pages (this device)'),
-      row('Details banner', toggle(us.detailsBanner, on => { us.setLocal('detailsBanner', on); saved(); }), 'Banner art at the top of title pages, when backdrops are off (this device)'),
+      localRow('Theme songs', toggle(us.themeSongs, on => { us.setLocal('themeSongs', on); saved(); }), 'Play theme music on title pages (this device)'),
+      localRow('Theme videos', toggle(us.themeVideos, on => { us.setLocal('themeVideos', on); saved(); }), 'Play theme videos behind title pages (this device)'),
+      localRow('Backdrops', toggle(us.backdrops, on => { us.setLocal('backdrops', on); app.refreshBackdrops(); saved(); }), 'Show backdrops behind library and title pages (this device)'),
+      localRow('Details banner', toggle(us.detailsBanner, on => { us.setLocal('detailsBanner', on); saved(); }), 'Banner art at the top of title pages, when backdrops are off (this device)'),
       row('Episode images in Next up and Continue watching', toggle(us.episodeImages, on => savePref('useEpisodeImagesInNextUpAndResume', on)), 'Off shows the series art instead'),
-      row('Next up: maximum days', select(NEXTUP_DAYS, us.maxDaysNextUp, v => { us.setLocal('maxDaysForNextUp', Number(v)); saved(); }), 'Hide shows not watched for longer than this (this device)'),
-      row('Next up: include rewatching', toggle(us.rewatchingNextUp, on => { us.setLocal('enableRewatchingInNextUp', on); saved(); }), 'This device'),
+      localRow('Next up: maximum days', select(NEXTUP_DAYS, us.maxDaysNextUp, v => { us.setLocal('maxDaysForNextUp', Number(v)); saved(); }), 'Hide shows not watched for longer than this (this device)'),
+      localRow('Next up: include rewatching', toggle(us.rewatchingNextUp, on => { us.setLocal('enableRewatchingInNextUp', on); saved(); }), 'This device'),
       cfgRow('Show missing episodes in seasons', toggle(cfg.DisplayMissingEpisodes, on => saveCfg({ DisplayMissingEpisodes: on }))),
       cfgRow('Hide watched items in Latest', toggle(cfg.HidePlayedInLatest, on => saveCfg({ HidePlayedInLatest: on })))),
 
@@ -234,38 +241,38 @@ export async function settings(ctx) {
       cfgRow('Play next episode automatically', toggle(cfg.EnableNextEpisodeAutoPlay, on => saveCfg({ EnableNextEpisodeAutoPlay: on }))),
       row('Skip back', select(SKIPS, us.num('skipBackLength', 10000), v => savePref('skipBackLength', v))),
       row('Skip forward', select(SKIPS, us.num('skipForwardLength', 30000), v => savePref('skipForwardLength', v))),
-      row('Maximum streaming bitrate', select(BITRATES, us.maxBitrate, v => { us.setLocal('maxBitrate', Number(v)); saved(); }), 'Above this, Jellyfin transcodes (this device)'),
-      row('Maximum resolution', select(RESOLUTIONS, us.local('maxVideoWidth', 0), v => { us.setLocal('maxVideoWidth', Number(v)); saved(); }), 'Transcodes are scaled down to this (this device)'),
-      row('Limit direct play to that resolution', toggle(us.local('limitSupportedVideoResolution', false), on => { us.setLocal('limitSupportedVideoResolution', on); saved(); }),
+      localRow('Maximum streaming bitrate', select(BITRATES, us.maxBitrate, v => { us.setLocal('maxBitrate', Number(v)); saved(); }), 'Above this, Jellyfin transcodes (this device)'),
+      localRow('Maximum resolution', select(RESOLUTIONS, us.local('maxVideoWidth', 0), v => { us.setLocal('maxVideoWidth', Number(v)); saved(); }), 'Transcodes are scaled down to this (this device)'),
+      localRow('Limit direct play to that resolution', toggle(us.local('limitSupportedVideoResolution', false), on => { us.setLocal('limitSupportedVideoResolution', on); saved(); }),
         'Larger files are transcoded instead of played as they are (this device)'),
-      row('Audio channels', select(CHANNELS, us.local('allowedAudioChannels', 0), v => { us.setLocal('allowedAudioChannels', Number(v)); saved(); }), 'More than this and the server downmixes (this device)'),
-      row('Preferred video codec when transcoding', select([['Auto', ''], ['H.264', 'h264'], ...(c.hevc ? [['HEVC', 'hevc']] : []), ...(c.av1 ? [['AV1', 'av1']] : [])],
+      localRow('Audio channels', select(CHANNELS, us.local('allowedAudioChannels', 0), v => { us.setLocal('allowedAudioChannels', Number(v)); saved(); }), 'More than this and the server downmixes (this device)'),
+      localRow('Preferred video codec when transcoding', select([['Auto', ''], ['H.264', 'h264'], ...(c.hevc ? [['HEVC', 'hevc']] : []), ...(c.av1 ? [['AV1', 'av1']] : [])],
         us.local('preferredTranscodeVideoCodec', ''), v => { us.setLocal('preferredTranscodeVideoCodec', v); saved(); }), 'This device'),
-      row('Preferred audio codec when transcoding', select([['Auto', ''], ['AAC', 'aac'], ['MP3', 'mp3'], ...(c.ac3 ? [['AC-3', 'ac3']] : []), ...(c.eac3 ? [['E-AC-3', 'eac3']] : []), ...(c.opus ? [['Opus', 'opus']] : []), ...(c.flac ? [['FLAC', 'flac']] : [])],
+      localRow('Preferred audio codec when transcoding', select([['Auto', ''], ['AAC', 'aac'], ['MP3', 'mp3'], ...(c.ac3 ? [['AC-3', 'ac3']] : []), ...(c.eac3 ? [['E-AC-3', 'eac3']] : []), ...(c.opus ? [['Opus', 'opus']] : []), ...(c.flac ? [['FLAC', 'flac']] : [])],
         us.local('preferredTranscodeVideoAudioCodec', ''), v => { us.setLocal('preferredTranscodeVideoAudioCodec', v); saved(); }), 'This device'),
-      row('Cinema mode', toggle(us.local('enableCinemaMode', true), on => { us.setLocal('enableCinemaMode', on); saved(); }),
+      localRow('Cinema mode', toggle(us.local('enableCinemaMode', true), on => { us.setLocal('enableCinemaMode', on); saved(); }),
         'Play the server\u2019s trailers and intros before a film started from the beginning (this device)'),
-      row('Ask “Are you still watching?”', select(STILL, us.local('stillWatchingPrompt', 'disabled'), v => { us.setLocal('stillWatchingPrompt', v); saved(); }),
+      localRow('Ask “Are you still watching?”', select(STILL, us.local('stillWatchingPrompt', 'disabled'), v => { us.setLocal('stillWatchingPrompt', v); saved(); }),
         'Before the next episode, after a long run without touching anything (this device)'),
-      row('Burn in subtitles', select(BURN_IN, us.subtitleBurnIn, v => { us.setLocal('subtitleburnin', v); saved(); }),
+      localRow('Burn in subtitles', select(BURN_IN, us.subtitleBurnIn, v => { us.setLocal('subtitleburnin', v); saved(); }),
         'Styled (ASS) and Blu-ray picture (PGS) subtitles are drawn by the browser; burning them in makes the server transcode (this device)'),
-      row('Show “Up next” before the end', toggle(us.nextVideoInfo, on => { us.setLocal('enableNextVideoInfoOverlay', on); saved(); }), 'A countdown card for the next episode (this device)'),
-      h('h3.set-h', 'Media segments'),
-      h('p.dlg-note', 'What to do when an episode reaches a marked section, such as an intro found by Intro Skipper (this device).'),
-      SEGMENTS.map(([type, label]) => row(label, select(SEG_ACTIONS, us.segmentAction(type), v => { us.setLocal(`segmentTypeAction__${type}`, v); saved(); })))),
+      localRow('Show “Up next” before the end', toggle(us.nextVideoInfo, on => { us.setLocal('enableNextVideoInfoOverlay', on); saved(); }), 'A countdown card for the next episode (this device)'),
+      other ? null : h('h3.set-h', 'Media segments'),
+      other ? null : h('p.dlg-note', 'What to do when an episode reaches a marked section, such as an intro found by Intro Skipper (this device).'),
+      SEGMENTS.map(([type, label]) => localRow(label, select(SEG_ACTIONS, us.segmentAction(type), v => { us.setLocal(`segmentTypeAction__${type}`, v); saved(); })))),
 
     deck('Subtitles', { color: 'blue', num: 5 },
       cfgRow('Preferred subtitle language', select(langs, cfg.SubtitleLanguagePreference || '', v => saveCfg({ SubtitleLanguagePreference: v }))),
       cfgRow('Subtitle mode', select(SUB_MODES, cfg.SubtitleMode || 'Default', v => saveCfg({ SubtitleMode: v })), 'Which subtitles start automatically'),
       cfgRow('Remember subtitle selections', toggle(cfg.RememberSubtitleSelections, on => saveCfg({ RememberSubtitleSelections: on }))),
-      row('Always burn in when transcoding', toggle(us.local('alwaysBurnInSubtitleWhenTranscoding', false), on => { us.setLocal('alwaysBurnInSubtitleWhenTranscoding', on); saved(); }),
+      localRow('Always burn in when transcoding', toggle(us.local('alwaysBurnInSubtitleWhenTranscoding', false), on => { us.setLocal('alwaysBurnInSubtitleWhenTranscoding', on); saved(); }),
         'When the server transcodes anyway, have it draw every subtitle into the picture (this device)'),
-      h('h3.set-h', 'Appearance'),
-      h('p.dlg-note', 'For plain text subtitles (SRT, WebVTT) on this device. Styled and picture subtitles keep their own look.'),
-      appearance),
+      other ? null : [h('h3.set-h', 'Appearance'),
+        h('p.dlg-note', 'For plain text subtitles (SRT, WebVTT) on this device. Styled and picture subtitles keep their own look.'),
+        appearance]),
 
-    deck('LCARS client', { color: 'salmon', num: 6 },
-      row('Audio cues', toggle(app.sound.on, () => app.sound.toggle()), 'Panel chirps when you press controls'),
+    other ? null : deck('LCARS client', { color: 'salmon', num: 6 },
+      localRow('Audio cues', toggle(app.sound.on, () => app.sound.toggle()), 'Panel chirps when you press controls'),
       h('h3.set-h', 'Decoder capabilities'),
       h('div.kv',
         h('span', 'H.264 / HEVC'), h('span', `${yes(c.h264)} / ${yes(c.hevc)}`),

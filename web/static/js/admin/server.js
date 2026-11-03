@@ -3,7 +3,7 @@
 // form says so); Devices, API keys and Backups act straight away.
 import { h, fill } from '../h.js';
 import * as f from '../fmt.js';
-import { deck, btn, tag, empty, toast, errorBox } from '../ui.js';
+import { deck, deckAction, btn, tag, empty, toast, errorBox } from '../ui.js';
 import { confirmDialog, dialog } from '../menu.js';
 import { editForm, row } from './form.js';
 
@@ -79,7 +79,7 @@ async function networking(ctx) {
       delete c._pub;
       await api.post('/System/Configuration/network', c);
     },
-    restartKeys: ['InternalHttpPort', 'InternalHttpsPort', 'BaseUrl', 'EnableHttps', 'RequireHttps', 'CertificatePath', 'CertificatePassword',
+    restartKeys: ['InternalHttpPort', 'InternalHttpsPort', 'PublicHttpPort', 'PublicHttpsPort', 'BaseUrl', 'EnableHttps', 'RequireHttps', 'CertificatePath', 'CertificatePassword',
       'LocalNetworkAddresses', 'EnableIPv4', 'EnableIPv6', 'KnownProxies', 'LocalNetworkSubnets'],
   });
   await fo.ready;
@@ -98,6 +98,7 @@ async function networking(ctx) {
         deck('Ports and address', { color: 'orange', num: 1 },
           h('p.dlg-note', 'Changes here apply after a restart; the restart banner offers one.'),
           row('HTTP port', fo.num('InternalHttpPort', { min: 1, max: 65535 })),
+          row('Public HTTP port', fo.num('PublicHttpPort', { min: 1, max: 65535 }), 'The port the outside world uses for it, if a router maps another one'),
           row('Base URL', fo.text('BaseUrl', { placeholder: '/jellyfin' }), 'A path prefix, if a proxy serves the server under one'),
           row('Bind to addresses', fo.tags('LocalNetworkAddresses', { placeholder: 'Add an address' }), 'Empty: all of them'),
           row('IPv4', t('EnableIPv4')),
@@ -106,6 +107,7 @@ async function networking(ctx) {
           row('HTTPS', httpsT, 'Most set-ups leave this to the reverse proxy'),
           https ? [
             row('HTTPS port', fo.num('InternalHttpsPort', { min: 1, max: 65535 })),
+            row('Public HTTPS port', fo.num('PublicHttpsPort', { min: 1, max: 65535 }), 'The port the outside world uses for it'),
             row('Require HTTPS', t('RequireHttps'), 'Redirect plain HTTP (not for the LAN)'),
             row('Certificate (.pfx)', fo.path('CertificatePath', api)),
             row('Certificate password', fo.text('CertificatePassword'))] : null),
@@ -188,8 +190,8 @@ async function devices(ctx) {
   const { api, signal } = ctx;
   ctx.setTitle('Devices');
   const body = h('div');
+  let list = [];
   async function load() {
-    let list;
     try { list = (await api.get('/Devices', undefined, { signal })).Items || []; } catch (e) { fill(body, errorBox(e)); return; }
     list.sort((a, b) => Date.parse(b.DateLastActivity) - Date.parse(a.DateLastActivity));
     fill(body, list.length ? h('div.eng-devs', list.map(d => {
@@ -218,8 +220,18 @@ async function devices(ctx) {
     if (!(await confirmDialog('Delete device', `Delete “${d.CustomName || d.Name}”? Its sign-in ends; ${d.LastUserName || 'its user'} signs in again on it next time.`, 'Delete'))) return;
     try { await api.del('/Devices', { id: d.Id }); toast('Device deleted', d.CustomName || d.Name, 'red', 2000); load(); } catch (e) { toast('Unable to comply', e.message, 'red'); }
   }
+  // As official: every device but this one. Everyone else signs in again.
+  async function removeAll() {
+    const others = list.filter(d => d.Id !== api.deviceId);
+    if (!others.length) { toast('Nothing to delete', 'This browser is the only device', 'sky', 2500); return; }
+    if (!(await confirmDialog('Delete all devices', `Delete all ${others.length} other devices? Every sign-in except this browser’s ends; people sign in again on each.`, 'Delete all'))) return;
+    let failed = 0;
+    for (const d of others) { try { await api.del('/Devices', { id: d.Id }); } catch { failed++; } }
+    toast(failed ? 'Some devices remain' : 'Devices deleted', failed ? `${failed} couldn’t be deleted` : `${others.length} devices`, 'red', 3000);
+    load();
+  }
   await load();
-  return deck('Devices', { color: 'sky', num: 1 }, body);
+  return deck('Devices', { color: 'sky', num: 1, actions: [deckAction('Delete all', removeAll, 'Delete every device except this browser')] }, body);
 }
 
 // ---- API keys ---------------------------------------------------------------------------------------

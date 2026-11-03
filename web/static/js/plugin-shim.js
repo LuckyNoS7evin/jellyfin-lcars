@@ -218,6 +218,31 @@
     }
   }
 
+  // ---- images -------------------------------------------------------------------------------------
+  // A page builds image addresses with ApiClient.getUrl (the placeholder address) or points at
+  // jellyfin-web's own pictures ("assets/img/avatar.png"), neither of which exists here. Server
+  // images go to the server; anything else that fails to load becomes an LCARS placeholder.
+  let imageBase = null;
+  const PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50"><rect width="50" height="50" fill="#a8829f"/><circle cx="25" cy="19" r="9" fill="#000"/><path d="M8 46c2-10 9-15 17-15s15 5 17 15z" fill="#000"/></svg>');
+  function fixImage(img) {
+    const src = img.getAttribute('src');
+    if (!src || src.startsWith('data:') || src.startsWith('blob:')) return;
+    const path = toPath(src);
+    if (path && imageBase && /^\/(Items|Users|Persons|Artists|Genres|Studios|MusicGenres|Branding|Plugins)\//i.test(path)) img.setAttribute('src', imageBase + path);
+    else if (/^(\.\/)?assets\//i.test(src)) img.setAttribute('src', PLACEHOLDER);
+  }
+  const fixImages = root => { if (root.tagName === 'IMG') fixImage(root); else root.querySelectorAll?.('img[src]').forEach(fixImage); };
+  new MutationObserver(list => {
+    for (const m of list) {
+      if (m.type === 'attributes') fixImage(m.target);
+      else for (const n of m.addedNodes) if (n.nodeType === 1) fixImages(n);
+    }
+  }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
+  document.addEventListener('error', e => {
+    const img = e.target;
+    if (img?.tagName === 'IMG' && img.getAttribute('src') !== PLACEHOLDER) img.setAttribute('src', PLACEHOLDER);
+  }, true);
+
   // ---- loading a page ----------------------------------------------------------------------------
 
   function runScripts(root, files) {
@@ -275,7 +300,7 @@
   window.addEventListener('message', e => {
     if (e.source !== parentWin) return;
     const m = e.data || {};
-    if (m.lcars === 'load') { ApiClient.getCurrentUser().catch(() => {}); load(m.html, m.files || {}); }
+    if (m.lcars === 'load') { imageBase = m.imageBase || null; ApiClient.getCurrentUser().catch(() => {}); load(m.html, m.files || {}); }
     else if (m.lcars === 'reply') {
       const w = waiting.get(m.id);
       if (w) { waiting.delete(m.id); w.resolve(m); }

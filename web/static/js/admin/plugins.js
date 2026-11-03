@@ -44,7 +44,10 @@ async function installed(ctx) {
     } catch (e) { fill(body, errorBox(e)); return; }
     list.sort((a, b) => a.Name.localeCompare(b.Name));
     fill(body, list.length ? h('div.eng-plugins', list.map(p => {
-      const page = pages.find(x => x.PluginId === p.Id && !/\.(js|css)$/i.test(x.Name)) || null;
+      // As official: the page a plugin puts in the menu first; others it lists there get a button too.
+      const own = pages.filter(x => x.PluginId === p.Id && !/\.(js|css)$/i.test(x.Name));
+      const page = own.find(x => x.EnableInMainMenu) || own[0] || null;
+      const extra = own.filter(x => x.EnableInMainMenu && x !== page);
       const pkg = packages.find(x => x.guid === p.Id);
       const latest = pkg?.versions?.[0];
       const update = latest && newer(latest.version, p.Version) ? latest : null;
@@ -56,7 +59,9 @@ async function installed(ctx) {
           h('div.eng-sess-m', tag(`v${p.Version}`, 'blue'), tag(st, color), update ? tag(`v${update.version} available`, 'orange') : null),
           p.Description ? h('span.eng-ro', p.Description) : null),
         h('div.eng-plugin-a',
-          page && p.Status === 'Active' ? btn('Settings', () => { location.hash = `#/admin/plugins/settings/${encodeURIComponent(page.Name)}`; }, { small: true, color: 'orange' }) : null,
+          page && p.Status === 'Active' ? btn(page.EnableInMainMenu && page.DisplayName && page.DisplayName !== p.Name ? page.DisplayName : 'Settings',
+            () => { location.hash = `#/admin/plugins/settings/${encodeURIComponent(page.Name)}`; }, { small: true, color: 'orange' }) : null,
+          p.Status === 'Active' ? extra.map(x => btn(x.DisplayName || x.Name, () => { location.hash = `#/admin/plugins/settings/${encodeURIComponent(x.Name)}`; }, { small: true, color: 'orange', ghost: true })) : null,
           update && pending.get(p.Id) === update.version ? tag('Updates on restart', 'orange')
             : update ? btn('Update', () => install(api, pkg, update, load), { small: true, color: 'sky' }) : null,
           p.Status === 'Active' ? btn('Disable', () => act(api, `/Plugins/${p.Id}/${p.Version}/Disable`, 'POST', `${p.Name} disabled`, load), { small: true, color: 'lilac', ghost: true })
@@ -214,7 +219,10 @@ async function settingsPage(ctx, name) {
     const reply = (id, data) => frame.contentWindow.postMessage({ lcars: 'reply', id, ...data }, '*');
     if (m.lcars === 'ready') {
       status.remove();
-      frame.contentWindow.postMessage({ lcars: 'load', html, files }, '*');
+      // Images go straight to the server (Jellyfin serves them without a sign-in), so the page
+      // gets the server's real address for them; its other requests still come through here.
+      const imageBase = new URL(api.base || '/', location.href).href.replace(/\/+$/, '');
+      frame.contentWindow.postMessage({ lcars: 'load', html, files, imageBase }, '*');
     } else if (m.lcars === 'height') {
       frame.style.height = `${Math.min(Math.max(200, m.h + 8), 20000)}px`;
     } else if (m.lcars === 'api') {

@@ -3,3 +3,6 @@
 /desktop/src-tauri/gen/
 /desktop/dist/
 /desktop/node_modules/
+/plugin/**/bin/
+/plugin/**/obj/
+/plugin/dist/

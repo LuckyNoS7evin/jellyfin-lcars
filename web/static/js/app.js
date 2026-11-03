@@ -46,7 +46,9 @@ async function adminRoute(ctx) {
   const m = await import('./admin/admin.js');
   app.adminRail = p => m.rail(p, app);
   drawRail(currentPath());
-  return m.admin(ctx);
+  const page = await m.admin(ctx);
+  drawRail(currentPath()); // plugin pages for the rail arrive with the first page
+  return page;
 }
 const isAdminUser = () => !!app.me?.Policy?.IsAdministrator;
 

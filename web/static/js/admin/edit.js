@@ -20,6 +20,8 @@ export function toolsFor(item, me) {
   const admin = isAdmin(me);
   const t = [];
   if (admin && item.Type !== 'UserView' && item.Type !== 'CollectionFolder') t.push(['metadata', 'Metadata'], ['images', 'Images']);
+  // A library's own picture (official LibraryCard "Edit images").
+  if (admin && item.Type === 'CollectionFolder') t.push(['images', 'Images']);
   if (admin && IDENTIFY.has(item.Type) && item.LocationType !== 'Virtual') t.push(['identify', 'Identify']);
   if ((admin || me?.Policy?.EnableSubtitleManagement) && VIDEO.has(item.Type) && item.LocationType === 'FileSystem') t.push(['subtitles', 'Subtitles']);
   if (admin && item.Type === 'Audio') t.push(['lyrics', 'Lyrics']);
@@ -35,10 +37,12 @@ export async function edit(ctx) {
   if (!tools.length) { location.replace(`#/item/${id}`); return h('div'); }
   const cur = tools.find(([k]) => k === tool) ? tool : tools[0][0];
   ctx.setTitle(item.Name);
-  ctx.setParent(`#/item/${id}`);
+  // A library's page is its library view; the dashboard's library list is where this came from.
+  const back = item.Type === 'CollectionFolder' ? '#/admin/libraries' : `#/item/${id}`;
+  ctx.setParent(back);
   const sub = item.Type === 'Episode' ? [item.SeriesName, epCode(item)].filter(Boolean).join(' · ') : [item.Type, item.ProductionYear].filter(Boolean).join(' · ');
   const head = h('div.eng-edit-head',
-    h('div', h('a.eng-edit-t', { href: `#/item/${id}` }, item.Name), h('span', sub)),
+    h('div', h('a.eng-edit-t', { href: back }, item.Name), h('span', item.Type === 'CollectionFolder' ? 'Library' : sub)),
     h('div.tabs', tools.map(([k, label]) => h('a.tab', { href: `#/admin/edit/${id}/${k}`, class: k === cur ? 'on' : '' }, label))));
   const body = await { metadata, images, identify, subtitles, lyrics }[cur](ctx, item);
   return h('div.eng-edit', head, body);

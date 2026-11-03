@@ -9,7 +9,7 @@ import { confirmDialog, dialog } from '../menu.js';
 import { restartServer } from './admin.js';
 import { supports } from '../remote.js';
 
-const REASONS = {
+export const REASONS = {
   ContainerNotSupported: 'container', VideoCodecNotSupported: 'video codec', AudioCodecNotSupported: 'audio codec',
   SubtitleCodecNotSupported: 'subtitle format', AudioIsExternal: 'external audio', SecondaryAudioNotSupported: 'secondary audio',
   VideoProfileNotSupported: 'video profile', VideoLevelNotSupported: 'video level', VideoResolutionNotSupported: 'resolution',
@@ -74,7 +74,7 @@ export async function overview(ctx) {
     const frac = total ? d.UsedSpace / total : 0;
     return h('div.eng-store',
       h('div.eng-store-h', h('b', items.map(([l]) => l).join(' · ')),
-        h('span', total ? `${f.bytes(d.UsedSpace)} of ${f.bytes(total)} · ${f.bytes(d.FreeSpace)} free` : known ? 'empty' : 'not created yet')),
+        h('span', [total ? `${f.bytes(d.UsedSpace)} of ${f.bytes(total)} · ${f.bytes(d.FreeSpace)} free` : known ? 'empty' : 'not created yet', d.StorageType || ''].filter(Boolean).join(' · '))),
       seg(frac, { n: 40, tone: frac > 0.9 ? 'alert' : frac > 0.75 ? 'peach' : 'sky' }),
       h('div.eng-store-p', { title: items.map(([, p]) => p).join('\n') }, items.map(([, p]) => p).join(' · ')));
   };
@@ -105,6 +105,7 @@ export async function overview(ctx) {
         np ? [
           h('a.eng-sess-t', { href: `#/item/${np.Id}` }, [np.SeriesName, np.Type === 'Episode' ? epCode(np) : '', np.Name].filter(Boolean).join(' · ')),
           dur ? h('div.eng-sess-p', seg(pos / dur, { n: 30, tone: ps.IsPaused ? 'lilac' : 'orange' }), h('span', `${ps.IsPaused ? 'Paused ' : ''}${f.clock(pos)} / ${f.clock(dur)}`)) : null,
+          ti?.CompletionPercentage != null && !ti.IsVideoDirect ? h('div.eng-sess-p', seg(ti.CompletionPercentage / 100, { n: 30, tone: 'salmon' }), h('span', `Encoded ${Math.round(ti.CompletionPercentage)}%`)) : null,
           h('div.eng-sess-m',
             tag(method, ps.PlayMethod === 'Transcode' ? 'salmon' : 'sky'),
             ti ? [
@@ -118,6 +119,7 @@ export async function overview(ctx) {
         ] : h('div.eng-sess-idle', `Idle · last active ${f.ago(s.LastActivityDate)}`)),
       h('div.eng-sess-a',
         supports(s, 'DisplayMessage') ? btn('Message', () => askMessage(s), { small: true, color: 'sky', ghost: true }) : null,
+        np && s.SupportsMediaControl ? btn(ps.IsPaused ? 'Play' : 'Pause', () => playPause(s), { small: true, color: 'sky', ghost: true }) : null,
         np && s.SupportsMediaControl ? btn('Stop', () => stopSession(s), { small: true, color: 'red', ghost: true }) : null));
   }
   function askMessage(s) {
@@ -127,6 +129,9 @@ export async function overview(ctx) {
     d = dialog(`Message ${s.UserName || ''} on ${s.DeviceName}`.replace('  ', ' '), h('form.dlg-form', { onsubmit: e => { e.preventDefault(); send(); } }, text),
       [btn('Cancel', () => d.close(), { color: 'lilac', ghost: true }), btn('Send', send, { color: 'sky' })], { color: 'sky' });
     setTimeout(() => text.focus(), 0);
+  }
+  async function playPause(s) {
+    try { await api.post(`/Sessions/${s.Id}/Playing/PlayPause`); } catch (e) { toast('Unable to comply', e.message, 'red'); }
   }
   async function stopSession(s) {
     const who = `${s.UserName || 'someone'} on ${s.DeviceName}`;
