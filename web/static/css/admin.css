@@ -79,7 +79,6 @@
 .eng-savebar b { color: var(--orange); letter-spacing: .06em; }
 .eng-save-msg { color: var(--alert); text-transform: none; }
 .eng-savebar .grow { flex: 1; }
-.inp.num { max-width: 14ch; }
 .inp.area { min-height: 8em; resize: vertical; font-family: ui-monospace, monospace; text-transform: none; }
 .eng-path { display: flex; gap: 8px; align-items: center; }
 .eng-path .inp { flex: 1; min-width: 0; text-transform: none; }
@@ -90,19 +89,24 @@
 .eng-dir.up { border-left-color: var(--lilac); color: var(--lilac); }
 
 /* checklists, tags, schedules (form kit) */
-.eng-checks { display: flex; flex-wrap: wrap; gap: 6px; }
+.eng-checks { display: flex; flex-wrap: wrap; gap: 8px; }
 .eng-checks.off { opacity: .55; }
-.eng-check { padding: 4px 12px; border: 2px solid var(--blue); border-radius: 14px; background: transparent; color: var(--blue);
-  font: inherit; font-size: 15px; cursor: pointer; }
+/* Chips (libraries, devices, unrated types) sized like the switches: same height, at least
+   the same width, text centred. */
+.eng-check { height: var(--ctl-h, 36px); min-width: var(--ctl-short, 128px); padding: 0 16px; border: 2px solid var(--blue);
+  border-radius: calc(var(--ctl-h, 36px) / 2); background: transparent; color: var(--blue);
+  font: 700 16px "Antonio", sans-serif; text-transform: uppercase; letter-spacing: .05em; text-align: center; cursor: pointer; }
 .eng-check.on { background: var(--blue); color: #000; }
 .eng-check:disabled { cursor: default; }
 .eng-check:not(:disabled):hover, .eng-check:focus-visible { filter: brightness(1.25); outline: none; }
 .eng-allor { display: grid; gap: 8px; margin-bottom: 8px; }
 .eng-allor-h { display: flex; gap: 10px; align-items: center; }
 .eng-allor-h span { color: var(--peach); }
+/* The label reads bold while its switch is on (All libraries, Any device...). */
+.eng-allor-h:has(.toggle.on) span { font-weight: 700; color: var(--orange); }
 .eng-tagbox { display: grid; gap: 6px; }
 .eng-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-.eng-tag { display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px 2px 10px; background: var(--lilac); color: #000; border-radius: 12px; font-size: 15px; }
+.eng-tag { display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px 2px 10px; background: var(--lilac); color: #000; border-radius: 12px; font-size: 16px; }
 .eng-tag button { border: 0; background: #0003; color: #000; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px; }
 .eng-scheds { display: grid; gap: 8px; justify-items: start; }
 .eng-sched { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
@@ -129,3 +133,7 @@
 .eng-two { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: start; }
 @media (max-width: 720px) { .eng-two { grid-template-columns: minmax(0, 1fr); } }
 .eng-danger { margin-top: 18px; padding-top: 12px; border-top: 1px solid #2a1414; }
+/* Long controls take the whole column, like the selects and text boxes. */
+.set-c .eng-tagbox, .set-c .eng-path { width: 100%; }
+/* Antonio's capitals sit ~0.067em low in their box: lift the placeholder letter to the middle. */
+.eng-user-none { line-height: 1; padding-bottom: .13em; box-sizing: border-box; }

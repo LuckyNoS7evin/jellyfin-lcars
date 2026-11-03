@@ -60,12 +60,12 @@ async function add(ctx) {
   const chosen = new Set();
   const access = h('div');
   function drawAccess() {
-    fill(access,
+    fill(access, h('div.eng-allor',
       h('div.eng-allor-h', h('button.toggle', { type: 'button', class: all ? 'on' : '', onclick: () => { all = !all; drawAccess(); } }, all ? 'On' : 'Off'), h('span', 'All libraries')),
       h('div.eng-checks', { class: all ? 'off' : '' }, folders.map(fo => h('button.eng-check', {
         type: 'button', class: all || chosen.has(fo.Id) ? 'on' : '', disabled: all,
         onclick: () => { if (chosen.has(fo.Id)) chosen.delete(fo.Id); else chosen.add(fo.Id); drawAccess(); },
-      }, fo.Name))));
+      }, fo.Name)))));
   }
   drawAccess();
   const msg = h('p.msg', { attrs: { role: 'status' } });
