@@ -10,6 +10,7 @@ import (
 	"net/http/httputil"
 	"net/netip"
 	"net/url"
+	"regexp"
 	"strings"
 )
 
@@ -50,8 +51,21 @@ const csp = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src
 	"media-src 'self' blob:; worker-src 'self' blob:; font-src 'self'; connect-src 'self'; " +
 	"manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 
-// maxBody caps request bodies sent through to Jellyfin (playback reports, logins).
-const maxBody = 1 << 20
+// maxBody caps request bodies sent through to Jellyfin (playback reports, logins, settings).
+// Uploads get maxUpload: item images, subtitles, lyrics, the splash screen and avatars.
+const (
+	maxBody   = 1 << 20
+	maxUpload = 64 << 20
+)
+
+var uploadPath = regexp.MustCompile(`^/jf/(Items/[^/]+/Images/[^/]+(/\d+)?|Videos/[^/]+/Subtitles|Audio/[^/]+/Lyrics|Branding/Splashscreen|Users/[^/]+/Images/[^/]+|UserImage)$`)
+
+func bodyLimit(r *http.Request) int64 {
+	if r.Method == http.MethodPost && uploadPath.MatchString(r.URL.Path) {
+		return maxUpload
+	}
+	return maxBody
+}
 
 // guard applies the peer allowlist, the method allowlist and the security headers.
 func (s *Server) guard(next http.Handler) http.Handler {
@@ -74,7 +88,7 @@ func (s *Server) guard(next http.Handler) http.Handler {
 		if strings.HasPrefix(r.URL.Path, "/jf/") {
 			// Jellyfin authenticates with the Authorization header, not cookies, so a
 			// cross-site request can't act as the user; the body cap is just hygiene.
-			r.Body = http.MaxBytesReader(w, r.Body, maxBody)
+			r.Body = http.MaxBytesReader(w, r.Body, bodyLimit(r))
 			next.ServeHTTP(w, r)
 			return
 		}

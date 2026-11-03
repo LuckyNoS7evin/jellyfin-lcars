@@ -38,7 +38,17 @@ const ROUTES = [
   [/^\/settings$/, settings],
   [/^\/remote$/, remoteView],
   [/^\/quickconnect$/, quickConnect],
+  // The admin dashboard, loaded on first use (js/admin/).
+  [/^\/admin(?:\/(.*))?$/, adminRoute, ['sub']],
 ];
+
+async function adminRoute(ctx) {
+  const m = await import('./admin/admin.js');
+  app.adminRail = m.rail;
+  drawRail(currentPath());
+  return m.admin(ctx);
+}
+const isAdminUser = () => !!app.me?.Policy?.IsAdministrator;
 
 const app = {
   version: VERSION,
@@ -366,8 +376,18 @@ function drawRail(path = '') {
   const pill = (href, n, label, color, active) => h('a.pill', { href, class: `c-${color}${active ? ' active' : ''}`, attrs: active ? { 'aria-current': 'page' } : {} },
     h('span.pill-n', n), h('span.pill-t', label));
   const [lcls, ltxt] = LINK[app.link] || LINK.connecting;
+  // In the dashboard: its own sections and the engineering palette.
+  const eng = authed && path.startsWith('/admin') && app.adminRail;
+  frameEl.classList.toggle('eng', !!eng);
   fill(railEl, h('div.rail',
-    authed ? [
+    eng ? [
+      h('button.pill.c-blue.back-btn', {
+        type: 'button', onclick: goBack, disabled: !canGoBack(path),
+        title: 'Back (Backspace)', attrs: { 'aria-label': 'Back' },
+      }, arrow('l'), h('span.pill-t', 'Back')),
+      app.adminRail(path).map(p => pill(p.href, p.n, p.label, p.color, p.active)),
+      pill('#/home', 'EXT', 'Leave engineering', 'peach', false),
+    ] : authed ? [
       h('button.pill.c-blue.back-btn', {
         type: 'button', onclick: goBack, disabled: !canGoBack(path),
         title: 'Back (Backspace)', attrs: { 'aria-label': 'Back' },
@@ -378,6 +398,7 @@ function drawRail(path = '') {
       pill('#/search', 'SRC', 'Search', 'peach', path === '/search'),
       app.queue.active ? pill('#/queue', 'AUD', 'Audio queue', 'sky', path === '/queue') : null,
       pill('#/settings', 'CFG', 'Settings', 'red', path === '/settings'),
+      isAdminUser() ? pill('#/admin/overview', 'ENG', 'Engineering', 'orange', path.startsWith('/admin')) : null,
     ] : pill('#/', 'ACC', 'Access', 'orange', true),
     h('div.pill.filler.fr'),
     authed ? h('div.pill.link', { class: lcls, attrs: { role: 'status' } }, h('span.pill-n', 'LNK'), h('span.pill-t', ltxt)) : null));
@@ -580,6 +601,8 @@ async function route({ keepScroll = false } = {}) {
 
   navCtrl?.abort();
   navCtrl = new AbortController();
+  lastHash = location.hash;
+  if (!keepScroll) { app.leaveGuard?.clear(); app.leaveGuard = null; }
   if (!keepScroll) clearSelection(); // a selection belongs to the page it was made on
   const signal = navCtrl.signal;
   const saved = stampEntry();
@@ -608,7 +631,23 @@ async function route({ keepScroll = false } = {}) {
     fill(mainEl, errorBox(e));
   }
 }
-window.addEventListener('hashchange', () => route());
+// A dashboard page with unsaved changes asks before you leave it (admin/form.js sets the guard).
+let lastHash = location.hash;
+let skipHash = false;
+window.addEventListener('hashchange', async () => {
+  if (skipHash) { skipHash = false; return; }
+  const g = app.leaveGuard;
+  if (g?.dirty()) {
+    const target = location.hash;
+    skipHash = true;
+    location.replace(lastHash || '#/home'); // stay put while asking
+    if (!(await g.confirmLeave())) return;
+    g.clear();
+    location.hash = target;
+    return;
+  }
+  route();
+});
 
 // ---- remote control (server WebSocket) -------------------------------------------------------
 // Commands other Jellyfin apps (and the server dashboard) send to this one, as the official
@@ -679,14 +718,33 @@ async function generalCommand(name, a) {
   }
 }
 
+// ---- socket subscriptions ---------------------------------------------------------------------
+// The server pushes some data while asked to: <Type>Start with "initial delay,interval" in ms, and
+// <Type>Stop. Sessions (Play on, the admin overview), ScheduledTasksInfo, ActivityLogEntry. Several
+// parts of the app can want the same one; the server is asked once, and again after a reconnect.
+const subs = new Map(); // type -> {fns: Set, interval}
+app.subscribe = (type, fn, interval = '0,1500') => {
+  let s = subs.get(type);
+  if (!s) {
+    s = { fns: new Set(), interval };
+    subs.set(type, s);
+    app.socket?.send(`${type}Start`, interval);
+  }
+  s.fns.add(fn);
+  return () => {
+    s.fns.delete(fn);
+    if (!s.fns.size && subs.get(type) === s) { subs.delete(type); app.socket?.send(`${type}Stop`); }
+  };
+};
+function resubscribe() { for (const [type, s] of subs) app.socket?.send(`${type}Start`, s.interval); }
+
 async function onSocket(m) {
+  const sub = subs.get(m.MessageType);
+  if (sub) { for (const fn of [...sub.fns]) fn(m.Data); return; }
   const d = m.Data || {};
   const p = app.player;
   const q = app.queue;
   switch (m.MessageType) {
-    case 'Sessions':
-      app.remote.update(Array.isArray(d) ? d : []);
-      return;
     case 'Playstate': {
       const c = d.Command;
       const t = p || (q.active ? { toggle: () => q.toggle(), pause: () => q.pause(), play: () => q.resume(), close: () => q.stop(), seekTo: s => q.seekTo(s), seekBy: s => q.seekTo(q.position + s), next: () => q.next(), prev: () => q.prev() } : null);
@@ -746,7 +804,7 @@ function connect() {
     app.link = st;
     drawRail(currentPath());
     if (st === 'live') {
-      app.remote.resubscribe();
+      resubscribe();
       app.api.post('/Sessions/Capabilities/Full', {
         PlayableMediaTypes: ['Audio', 'Video'],
         SupportedCommands: SUPPORTED_COMMANDS,

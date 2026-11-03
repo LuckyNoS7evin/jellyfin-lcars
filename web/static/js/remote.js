@@ -19,7 +19,7 @@ export class Remote {
     this.seenAt = 0;        // when `target` arrived, to move the position on between updates
     this.listeners = new Set();
     this.watchers = 0;      // pages showing the session list
-    this.subscribed = false;
+    this.unsub = null;      // the Sessions subscription (app.subscribe) while one is wanted
   }
 
   on(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
@@ -131,19 +131,12 @@ export class Remote {
     return () => { this.watchers--; this.subscribe(); };
   }
 
-  /** Ask the server for session updates while something needs them; stop when nothing does. */
-  subscribe(force = false) {
+  /** Take session updates while something needs them; let go when nothing does. */
+  subscribe() {
     const want = this.active || this.watchers > 0;
-    if (want === this.subscribed && !force) return;
-    this.subscribed = want;
-    const s = this.app.socket;
-    if (!s) return;
-    // "initial delay,interval" in ms, as the official client sends.
-    if (want) s.send('SessionsStart', '0,1500'); else s.send('SessionsStop');
+    if (want && !this.unsub) this.unsub = this.app.subscribe('Sessions', d => this.update(Array.isArray(d) ? d : []));
+    else if (!want && this.unsub) { this.unsub(); this.unsub = null; }
   }
-
-  /** The socket reconnected: the server forgot the subscription. */
-  resubscribe() { if (this.subscribed) this.subscribe(true); }
 
   // ---- commands ---------------------------------------------------------------------------
 

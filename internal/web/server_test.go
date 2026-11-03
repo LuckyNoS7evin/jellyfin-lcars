@@ -104,3 +104,28 @@ func TestPeerAllowlist(t *testing.T) {
 		t.Errorf("outside peer got %d", w.Code)
 	}
 }
+
+func TestBodyLimit(t *testing.T) {
+	cases := []struct {
+		method, path string
+		want         int64
+	}{
+		{"POST", "/jf/Sessions/Playing", maxBody},
+		{"POST", "/jf/System/Configuration", maxBody},
+		{"POST", "/jf/Items/abc/Images/Primary", maxUpload},
+		{"POST", "/jf/Items/abc/Images/Backdrop/2", maxUpload},
+		{"POST", "/jf/Videos/abc/Subtitles", maxUpload},
+		{"POST", "/jf/Audio/abc/Lyrics", maxUpload},
+		{"POST", "/jf/Branding/Splashscreen", maxUpload},
+		{"POST", "/jf/UserImage", maxUpload},
+		{"POST", "/jf/Users/abc/Images/Primary", maxUpload},
+		{"GET", "/jf/Items/abc/Images/Primary", maxBody},
+		{"POST", "/jf/Items/abc/Images/Primary/x/y", maxBody},
+	}
+	for _, c := range cases {
+		r := httptest.NewRequest(c.method, c.path, nil)
+		if got := bodyLimit(r); got != c.want {
+			t.Errorf("%s %s: limit %d, want %d", c.method, c.path, got, c.want)
+		}
+	}
+}
