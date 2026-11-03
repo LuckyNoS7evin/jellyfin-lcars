@@ -282,6 +282,6 @@ export async function settings(ctx) {
         h('span', 'Client'), h('span', `${CLIENT} ${VERSION} · ${app.version}`),
         h('span', 'Device'), h('span', `${api.device} · ${api.deviceId.slice(0, 8)}`)),
       h('div.actions',
-        btn('Official Jellyfin web', () => window.open(api.url('/web/'), '_blank', 'noopener'), { color: 'lilac', ghost: true }),
+        app.hosted ? null : btn('Official Jellyfin web', () => window.open(api.url('/web/'), '_blank', 'noopener'), { color: 'lilac', ghost: true }),
         btn('Log out', () => app.logout(), { color: 'red' }))));
 }

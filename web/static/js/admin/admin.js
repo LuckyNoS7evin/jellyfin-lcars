@@ -35,7 +35,7 @@ let cssLoaded = false;
 function loadCss(app) {
   if (cssLoaded) return;
   cssLoaded = true;
-  document.head.append(h('link', { rel: 'stylesheet', href: `/static/${app.version}/css/admin.css` }));
+  document.head.append(h('link', { rel: 'stylesheet', href: `${app.assets}css/admin.css` }));
 }
 
 export const isAdmin = app => !!app.me?.Policy?.IsAdministrator;

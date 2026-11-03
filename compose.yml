@@ -1,0 +1,30 @@
+# Jellyfin with LCARS as its web client. Adjust the paths, then
+#   docker compose up -d
+# and open http://<this host>:8096. A new server starts with LCARS's first-run setup.
+#
+# The image is the official jellyfin/jellyfin image with LCARS in place of jellyfin-web, so it's
+# set up exactly as Jellyfin's own: the same volumes, ports, devices and environment variables.
+services:
+  jellyfin:
+    image: ghcr.io/luckynos7evin/jellyfin-lcars:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    user: "1000:1000"
+    environment:
+      TZ: Europe/London
+      # Any of Jellyfin's own variables work as usual, for example:
+      # JELLYFIN_PublishedServerUrl: https://jellyfin.example.org
+    volumes:
+      - ./jellyfin/config:/config
+      - ./jellyfin/cache:/cache
+      - /path/to/media:/media:ro
+    ports:
+      - "8096:8096"
+      # - "7359:7359/udp"   # auto-discovery for apps on the LAN
+    # Hardware transcoding, as with the official image. Intel or AMD (VA-API, QSV):
+    # devices:
+    #   - /dev/dri:/dev/dri
+    # NVIDIA (NVENC), with the NVIDIA Container Toolkit on the host:
+    # runtime: nvidia
+    # environment:
+    #   NVIDIA_VISIBLE_DEVICES: all

@@ -731,3 +731,8 @@ a.np-title:hover, a.np-title:focus-visible { text-decoration: underline; outline
   .dev { grid-template-columns: minmax(0, 1fr); }
   .dev-b { justify-content: flex-start; }
 }
+
+/* first-run setup */
+.wiz-steps { margin: 0 0 14px; }
+.wiz-steps .tab { cursor: default; }
+.wiz-steps .tab.done { color: var(--dim); }

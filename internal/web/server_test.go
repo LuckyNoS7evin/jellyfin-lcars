@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -175,5 +177,34 @@ func TestPluginHostCSP(t *testing.T) {
 	w = do(h, "GET", "/", "", nil)
 	if c := w.Header().Get("Content-Security-Policy"); strings.Contains(c, "'unsafe-inline'") || !strings.Contains(c, "frame-src 'self'") {
 		t.Errorf("main CSP %q", c)
+	}
+}
+
+func TestExport(t *testing.T) {
+	fsys := fstest.MapFS{
+		"index.html":       {Data: []byte("<head>\n{{CSP}}<meta name=\"lcars-api\" content=\"{{API}}\"><script type=\"module\" src=\"{{ASSETS}}js/app.js\"></script>{{PRELOAD}}</head>")},
+		"js/app.js":        {Data: []byte("import './a.js';")},
+		"js/a.js":          {Data: []byte("export const a = 1;")},
+		"plugin-host.html": {Data: []byte("<meta charset=\"utf-8\"><title>p</title>")},
+	}
+	dir := t.TempDir()
+	if err := Export(fsys, "v1", dir); err != nil {
+		t.Fatal(err)
+	}
+	idx, _ := os.ReadFile(filepath.Join(dir, "index.html"))
+	for _, want := range []string{`content="same-origin"`, `src="static/v1/js/app.js"`, `href="static/v1/js/a.js"`, `http-equiv="Content-Security-Policy"`} {
+		if !strings.Contains(string(idx), want) {
+			t.Errorf("index.html lacks %s:\n%s", want, idx)
+		}
+	}
+	if strings.Contains(string(idx), "frame-ancestors") {
+		t.Error("frame-ancestors in a meta CSP")
+	}
+	host, err := os.ReadFile(filepath.Join(dir, "static", "v1", "plugin-host.html"))
+	if err != nil || !strings.Contains(string(host), "connect-src 'none'") || strings.Contains(string(host), "sandbox") {
+		t.Errorf("plugin-host.html: %v\n%s", err, host)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "static", "v1", "js", "a.js")); err != nil {
+		t.Error(err)
 	}
 }

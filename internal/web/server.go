@@ -59,7 +59,7 @@ const csp = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src
 // origin even if opened on its own: it can't read LCARS's storage or token, and it can't fetch
 // anything itself (connect-src 'none'); it asks the dashboard, by postMessage, to make API calls.
 const pluginHostCSP = "default-src 'none'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; " +
-	"img-src 'self' data: blob: https:; font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; " +
+	"img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'; " +
 	"frame-ancestors 'self'; sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals"
 
 // maxBody caps request bodies sent through to Jellyfin (playback reports, logins, settings).

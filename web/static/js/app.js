@@ -20,12 +20,26 @@ import { queue as queueView, REPEAT_LABEL } from './views/queue.js';
 import { list } from './views/list.js';
 import { favourites } from './views/favourites.js';
 import { login } from './views/login.js';
+import { wizard } from './views/wizard.js';
 import { remote as remoteView } from './views/remote.js';
 import { quickConnect } from './views/quickconnect.js';
 import { Remote } from './remote.js';
 
-// The build version is the /static/<version>/ segment this module was loaded from.
-const VERSION = new URL(import.meta.url).pathname.split('/')[2] || 'dev';
+// Assets live in .../static/<version>/ wherever LCARS is served from: /static/ by its own server,
+// /web/static/ (under any base URL) when Jellyfin hosts it as its web client.
+const ASSETS = new URL('../', import.meta.url).href;
+const VERSION = new URL(ASSETS).pathname.split('/').filter(Boolean).pop() || 'dev';
+
+// Where the Jellyfin API is: index.html says (its server fills it in). "/jf" through LCARS's own
+// server; "same-origin" when Jellyfin hosts LCARS, the API then being the path before /web/.
+function apiBase() {
+  if (window.JFL_SERVER) return window.JFL_SERVER; // the desktop app
+  const said = document.querySelector('meta[name="lcars-api"]')?.content || '/jf';
+  if (said !== 'same-origin') return said;
+  const i = location.pathname.indexOf('/web/');
+  return i >= 0 ? location.pathname.slice(0, i) : '';
+}
+
 
 const ROUTES = [
   [/^\/home$/, home],
@@ -54,7 +68,10 @@ const isAdminUser = () => !!app.me?.Policy?.IsAdministrator;
 
 const app = {
   version: VERSION,
-  api: new Api(window.JFL_SERVER || '/jf'),
+  assets: ASSETS, // ends in /
+  // Jellyfin hosts LCARS as its web client: there's no jellyfin-web beside it.
+  hosted: document.querySelector('meta[name="lcars-api"]')?.content === 'same-origin',
+  api: new Api(apiBase()),
   us: null,       // UserSettings, loaded after sign-in
   sound: startSound(),
   views: [],
@@ -189,6 +206,8 @@ const app = {
   },
 
   start() { start(); },
+  /** After first-run setup: the sign-in screen, with the new administrator's name filled in. */
+  afterSetup(name) { showLogin(name); },
 
   /**
    * Full-page backdrops (the official "Backdrops" setting): a list of image URLs, or a
@@ -838,14 +857,19 @@ function connect() {
 
 // ---- start ----------------------------------------------------------------------------------
 
-function showLogin() {
+function showLogin(username = '') {
   navCtrl?.abort();
   app.socket?.close();
   app.views = [];
   drawHeader();
   drawRail();
   drawFoot();
-  fill(mainEl, login({ api: app.api, app, setTitle }));
+  fill(mainEl, loading('Establishing link'));
+  // A server that hasn't been set up has no one to sign in as: run its first-run setup.
+  app.api.publicInfo().then(info => {
+    const ctx = { api: app.api, app, setTitle };
+    fill(mainEl, info?.StartupWizardCompleted === false ? wizard(ctx) : login({ ...ctx, username }));
+  }).catch(() => fill(mainEl, login({ api: app.api, app, setTitle, username })));
 }
 
 async function start() {

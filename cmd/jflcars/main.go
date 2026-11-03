@@ -27,9 +27,17 @@ const defaultCIDRs = "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,127.
 
 func main() {
 	health := flag.Bool("healthcheck", false, "probe the local server and exit (for the container healthcheck)")
+	export := flag.String("export", "", "write LCARS as a web client folder for Jellyfin (JELLYFIN_WEB_DIR) to this path and exit")
 	flag.Parse()
 	if *health {
 		os.Exit(healthcheck())
+	}
+	if *export != "" {
+		if err := web.Export(webui.Static(), version, *export); err != nil {
+			fmt.Fprintln(os.Stderr, "export:", err)
+			os.Exit(1)
+		}
+		return
 	}
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, nil)))
 	if err := run(); err != nil {

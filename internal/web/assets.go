@@ -18,6 +18,7 @@ import (
 type assets struct {
 	files   map[string]*asset
 	version string
+	index   []byte // index.html as written, before render fills it in
 }
 
 type asset struct {
@@ -55,12 +56,21 @@ func loadAssets(fsys fs.FS, version string) (*assets, error) {
 	}
 	// index.html last: it lists the modules to preload, so they must all be loaded first.
 	if idx, ok := a.files["/index.html"]; ok {
-		b := bytes.ReplaceAll(idx.data, []byte("{{PRELOAD}}"), []byte(a.preloadLinks()))
-		// Cache-bust module URLs with the build version.
-		b = bytes.ReplaceAll(b, []byte("{{VERSION}}"), []byte(version))
-		a.files["/index.html"] = newAsset("index.html", b)
+		a.index = idx.data
+		// Served by LCARS: assets under /static/<version>/, the API through /jf, the CSP a header.
+		a.files["/index.html"] = newAsset("index.html", a.render("/static/"+version+"/", "/jf", ""))
 	}
 	return a, nil
+}
+
+// render fills in index.html: where the assets are (every URL carries the build version, which
+// busts caches), where the API is, and a CSP meta tag when no header will carry one.
+func (a *assets) render(assetsURL, api, cspMeta string) []byte {
+	b := bytes.ReplaceAll(a.index, []byte("{{PRELOAD}}"), []byte(a.preloadLinks()))
+	b = bytes.ReplaceAll(b, []byte("{{ASSETS}}"), []byte(assetsURL))
+	b = bytes.ReplaceAll(b, []byte("{{VERSION}}"), []byte(a.version))
+	b = bytes.ReplaceAll(b, []byte("{{API}}"), []byte(api))
+	return bytes.ReplaceAll(b, []byte("{{CSP}}"), []byte(cspMeta))
 }
 
 func newAsset(p string, b []byte) *asset {
@@ -117,7 +127,7 @@ func (a *assets) preloadModules() []string {
 func (a *assets) preloadLinks() string {
 	var b strings.Builder
 	for _, p := range a.preloadModules() {
-		b.WriteString(`<link rel="modulepreload" href="/static/{{VERSION}}/` + p + "\">\n")
+		b.WriteString(`<link rel="modulepreload" href="{{ASSETS}}` + p + "\">\n")
 	}
 	return b.String()
 }

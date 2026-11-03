@@ -197,7 +197,7 @@ async function settingsPage(ctx, name) {
   }
 
   const frame = h('iframe.eng-plugin-frame', {
-    src: `/static/${app.version}/plugin-host.html`,
+    src: `${app.assets}plugin-host.html`,
     title: `${plugin?.Name || name} settings`,
     attrs: { sandbox: 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals', referrerpolicy: 'no-referrer' },
   });

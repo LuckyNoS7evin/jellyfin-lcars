@@ -1,0 +1,7 @@
+bin/
+plugin/**/bin/
+plugin/**/obj/
+desktop/src-tauri/target/
+desktop/node_modules/
+desktop/dist/
+.git/

@@ -1,15 +1,19 @@
-# Tests, then builds the container image and pushes it to GHCR:
-#   ghcr.io/luckynos7evin/jellyfin-lcars:<first 7 of the commit>   every push to main
-#   ghcr.io/luckynos7evin/jellyfin-lcars:latest                     the newest main
-#   ghcr.io/luckynos7evin/jellyfin-lcars:v1.2.3                     a v* tag
-# The commit tag is also the build version the app puts in its asset URLs (/static/<version>/).
+# Tests, then builds Jellyfin with LCARS as its web client (Dockerfile) and pushes it to GHCR:
+#   ghcr.io/luckynos7evin/jellyfin-lcars:<jellyfin>-<first 7 of the commit>
+#   ghcr.io/luckynos7evin/jellyfin-lcars:<first 7 of the commit>   on the newest Jellyfin
+#   ghcr.io/luckynos7evin/jellyfin-lcars:<jellyfin>                the newest LCARS on that Jellyfin
+#   ghcr.io/luckynos7evin/jellyfin-lcars:latest
+# The commit is also the build version LCARS puts in its asset URLs (static/<version>/).
+# On every push to main, and each day: when Jellyfin has released since the last build, the daily
+# run builds on the new release, so a Jellyfin change that breaks LCARS shows up straight away.
 name: image
 
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   pull_request:
+  schedule:
+    - cron: "17 5 * * *"
   workflow_dispatch:
 
 permissions:
@@ -26,6 +30,10 @@ jobs:
       - run: go vet ./...
       - run: go test ./...
       - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet build plugin/Jellyfin.Plugin.Lcars/Jellyfin.Plugin.Lcars.csproj -c Release
 
   image:
     needs: test
@@ -36,29 +44,62 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+
+      # The newest stable Jellyfin: its version (for the plugin's NuGet packages) and the
+      # official image's newest build of it (tags look like 12.4.20261026-211555).
+      - id: jf
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(gh api repos/jellyfin/jellyfin/releases/latest --jq .tag_name | sed 's/^v//')
+          case $version in *.*.*) ;; *) version=$version.0 ;; esac  # "v12.4" is 12.4.0 on NuGet
+          minor=$(echo "$version" | cut -d. -f1,2)
+          tag=$(curl -sf "https://hub.docker.com/v2/repositories/jellyfin/jellyfin/tags?page_size=100&name=$minor." \
+            | jq -r --arg m "$minor" '[.results[].name | select(test("^" + ($m | gsub("\\."; "\\.")) + "\\.[0-9]{8}-[0-9]{6}$"))] | sort | last')
+          [ -n "$tag" ] && [ "$tag" != null ] || { echo "no image tag for Jellyfin $version"; exit 1; }
+          curl -sf "https://api.nuget.org/v3-flatcontainer/jellyfin.controller/index.json" | jq -e --arg v "$version" '.versions | index($v)' >/dev/null \
+            || { echo "Jellyfin.Controller $version isn't on NuGet yet"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Jellyfin $version, image $tag"
+
       - id: v
         run: |
           short=${GITHUB_SHA::7}
           image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/jellyfin-lcars
-          tags="$image:$short"
-          version=$short
-          if [ "$GITHUB_REF_TYPE" = tag ]; then tags="$tags,$image:$GITHUB_REF_NAME"; version=$GITHUB_REF_NAME; fi
-          if [ "$GITHUB_REF" = refs/heads/main ]; then tags="$tags,$image:latest"; fi
-          echo "tags=$tags" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "tags=$image:${{ steps.jf.outputs.version }}-$short,$image:$short,$image:${{ steps.jf.outputs.version }},$image:latest" >> "$GITHUB_OUTPUT"
+          echo "short=$short" >> "$GITHUB_OUTPUT"
+
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+
+      # The daily run only builds when this commit hasn't been built on this Jellyfin yet.
+      - id: need
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = schedule ] && docker manifest inspect "${{ steps.v.outputs.image }}:${{ steps.jf.outputs.version }}-${{ steps.v.outputs.short }}" >/dev/null 2>&1; then
+            echo "build=false" >> "$GITHUB_OUTPUT"; echo "Already built"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.need.outputs.build == 'true'
+        uses: docker/setup-qemu-action@v3
+      - if: steps.need.outputs.build == 'true'
+        uses: docker/setup-buildx-action@v3
+      - if: steps.need.outputs.build == 'true'
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.v.outputs.tags }}
-          build-args: VERSION=${{ steps.v.outputs.version }}
+          build-args: |
+            VERSION=${{ steps.v.outputs.short }}
+            JELLYFIN_TAG=${{ steps.jf.outputs.tag }}
+            JELLYFIN_VERSION=${{ steps.jf.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

@@ -6,7 +6,7 @@ import { deck, btn } from '../ui.js';
 export function login(ctx) {
   const { api, app } = ctx;
   ctx.setTitle('Access control');
-  const user = h('input.inp', { name: 'username', attrs: { autocomplete: 'username', required: true, autocapitalize: 'off', spellcheck: 'false' } });
+  const user = h('input.inp', { name: 'username', value: ctx.username || '', attrs: { autocomplete: 'username', required: true, autocapitalize: 'off', spellcheck: 'false' } });
   const pass = h('input.inp', { name: 'password', type: 'password', attrs: { autocomplete: 'current-password' } });
   const msg = h('p.msg', { attrs: { role: 'status' } });
   const submit = btn('Engage', null, { type: 'submit', color: 'orange' });
