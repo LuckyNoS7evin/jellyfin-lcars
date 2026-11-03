@@ -3,7 +3,7 @@
 // usual route context. The rail switches to the sections below while you're in here.
 import { h } from '../h.js';
 import { btn, toast } from '../ui.js';
-import { confirmDialog } from '../menu.js';
+import { confirmDialog, quietPasswordManagers } from '../menu.js';
 
 // The rail: a few groups rather than one pill per settings page. Pages are added as their
 // stage is built (admin-plan.md); `load` imports the page module.
@@ -13,6 +13,7 @@ export const SECTIONS = [
   { id: 'libraries', label: 'Libraries', n: 'E-03', color: 'lilac', load: () => import('./libraries.js').then(m => m.libraries) },
   { id: 'playback', label: 'Playback', n: 'E-04', color: 'peach', load: () => import('./playback.js').then(m => m.playback) },
   { id: 'ops', label: 'Operations', n: 'E-05', color: 'blue', load: () => import('./ops.js').then(m => m.ops) },
+  { id: 'server', label: 'Server', n: 'E-06', color: 'salmon', load: () => import('./server.js').then(m => m.server) },
   // Item tools (A8), opened from an item's ⋯ menu rather than the rail. Subtitle managers who
   // aren't admins may use the subtitle tool.
   { id: 'edit', hidden: true, load: () => import('./edit.js').then(m => m.edit),
@@ -39,7 +40,11 @@ export async function admin(ctx) {
   if (!section.hidden) ctx.setParent(id === 'overview' ? '#/home' : '#/admin/overview');
   const view = await section.load();
   const page = await view({ ...ctx, sub: rest });
-  return h('div.eng-page', await restartBanner(ctx), page);
+  const el = h('div.eng-page', await restartBanner(ctx), page);
+  // Settings boxes aren't sign-ins (except the password fields, which keep their autocomplete).
+  quietPasswordManagers(el);
+  new MutationObserver(() => quietPasswordManagers(el)).observe(el, { childList: true, subtree: true });
+  return el;
 }
 
 /** The rail while in the dashboard (app.js draws it with its own pill helper). */

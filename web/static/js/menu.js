@@ -13,11 +13,25 @@ export function dialog(title, body, actions = [], { color = 'orange', wide = fal
     h('div.dlg-body', body),
     actions.length ? h('div.actions.dlg-actions', actions) : null);
   const close = () => { el.close(); el.remove(); };
+  quietPasswordManagers(el);
   el.addEventListener('close', () => el.remove());
   el.addEventListener('click', e => { if (e.target === el) close(); }); // click on the backdrop
   document.body.append(el);
   el.showModal();
   return { el, close };
+}
+
+/**
+ * Tell password managers (1Password, LastPass, Bitwarden) to leave the boxes alone that aren't
+ * sign-ins: a "Rename" or "Message" box shouldn't get a password pop-up.
+ */
+export function quietPasswordManagers(root) {
+  for (const i of root.querySelectorAll('input:not([type=password]):not([autocomplete=username]), textarea')) {
+    i.setAttribute('data-1p-ignore', '');
+    i.setAttribute('data-lpignore', 'true');
+    i.setAttribute('data-bwignore', '');
+    if (!i.hasAttribute('autocomplete')) i.setAttribute('autocomplete', 'off');
+  }
 }
 
 /** Promise<boolean>: a yes/no question. */
