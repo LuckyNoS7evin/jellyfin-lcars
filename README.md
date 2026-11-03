@@ -1,6 +1,11 @@
 # jellyfin-lcars
 
+[![image build](https://github.com/LuckyNoS7evin/jellyfin-lcars/actions/workflows/image.yml/badge.svg)](https://github.com/LuckyNoS7evin/jellyfin-lcars/actions/workflows/image.yml)
+[![ghcr.io](https://img.shields.io/badge/ghcr.io-luckynos7evin%2Fjellyfin--lcars-blue?logo=docker&logoColor=white)](https://github.com/LuckyNoS7evin/jellyfin-lcars/pkgs/container/jellyfin-lcars)
+
 Jellyfin with an LCARS (Star Trek) web client. The image is the official Jellyfin server with LCARS in place of its web client (jellyfin-web): LCARS is what you see in a browser, its Engineering dashboard runs the server, and everything else about Jellyfin stays the same.
+
+![Home](docs/screenshots/01-home.jpg)
 
 - **Home** follows your Jellyfin home screen settings: section order, library order, and libraries excluded from "Latest".
 - **Libraries**: poster grids with sort and filter, loading more as you scroll. Music has Albums, Artists and Songs tabs.
@@ -15,6 +20,21 @@ Jellyfin with an LCARS (Star Trek) web client. The image is the official Jellyfi
 - Optional synthesised panel chirps (Configuration → Audio cues).
 - **Jellyfin's apps**: inside the iPhone app LCARS uses its native video player (when that setting is on) and turns the phone landscape for video; the LG TV app works with the remote (arrows, OK, Back, media keys), as does any TV browser.
 - **First-run setup** for a new server: name and language, the administrator, libraries, metadata and remote access.
+
+## Screenshots
+
+From a real server, with posters and titles blurred.
+
+| | |
+|---|---|
+| ![Library](docs/screenshots/02-library-movies.jpg) Library | ![Series](docs/screenshots/06-item-series.jpg) Series |
+| ![Episodes](docs/screenshots/08-item-episodes.jpg) Episodes | ![Album and mini player](docs/screenshots/09-item-album.jpg) Album, with the mini player |
+| ![Video player](docs/screenshots/10-player.jpg) Video player | ![Player options](docs/screenshots/11-player-options.jpg) Player options |
+| ![Audio queue](docs/screenshots/12-audio-queue.jpg) Audio queue | ![Settings](docs/screenshots/15-settings-display.jpg) Settings |
+| ![Engineering](docs/screenshots/20-eng-overview.jpg) Engineering | ![Viewing stats](docs/screenshots/23-eng-viewing-stats.jpg) Diagnostics: viewing stats |
+| ![Transcode history](docs/screenshots/24-eng-history.jpg) Diagnostics: transcode history | ![Plugins](docs/screenshots/28-eng-plugins.jpg) Plugins |
+
+More in [`docs/screenshots`](docs/screenshots). Clips: [library scrolling and loading more](docs/clips/anime-lazy-scroll.webm), [home](docs/clips/home-scroll.webm), [the rail](docs/clips/rail-scroll.webm).
 
 ## Run it
 
