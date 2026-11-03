@@ -334,3 +334,8 @@ ul { list-style: none; }
   .np-title { font-size: 22px; }
   .row .seg { flex-basis: 28%; }
 }
+
+/* TV remote (tv.js): where focus is, clearly, from across the room */
+.tv :focus { outline: 4px solid #fff; outline-offset: 3px; border-radius: 8px; }
+.tv .card:focus, .tv a:focus > .card, .tv .card:focus-within { transform: scale(1.04); transition: transform .12s; }
+.tv :focus:not(:focus-visible) { outline: 4px solid #fff; }

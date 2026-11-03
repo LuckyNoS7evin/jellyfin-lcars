@@ -13,6 +13,7 @@ Jellyfin with an LCARS (Star Trek) web client. The image is the official Jellyfi
 - **Quick Connect**: sign in with a code from another device, or authorise one from Settings.
 - **Engineering**: the admin dashboard, for everything Jellyfin's does (users, libraries, playback, tasks, logs, server settings, plugins and their own pages, item editing) plus diagnostics: library health, live transcodes and why, viewing stats, and transcode and storage history.
 - Optional synthesised panel chirps (Configuration → Audio cues).
+- **Jellyfin's apps**: inside the iPhone app LCARS uses its native video player (when that setting is on) and turns the phone landscape for video; the LG TV app works with the remote (arrows, OK, Back, media keys), as does any TV browser.
 - **First-run setup** for a new server: name and language, the administrator, libraries, metadata and remote access.
 
 ## Run it
@@ -50,9 +51,9 @@ Then `docker compose up -d` and open `http://<this host>:8096`. A new server sta
 
 It's a drop-in for `jellyfin/jellyfin`: the same volumes, ports, devices, user, command-line options and **all of Jellyfin's environment variables** (`JELLYFIN_PublishedServerUrl`, `JELLYFIN_DATA_DIR`, `JELLYFIN_CACHE_DIR`, `JELLYFIN_CONFIG_DIR`, `JELLYFIN_LOG_DIR`, `JELLYFIN_FFMPEG`, `TZ`, the `NVIDIA_*` ones, and the rest). Two are LCARS's own and best left alone: `JELLYFIN_WEB_DIR` points at LCARS, and `JELLYFIN_hostwebclient=false` (or `--nowebclient`) would turn it off. Going back to the official image is a matter of changing the `image:` line.
 
-- TV, phone and desktop apps (Android TV, Findroid, Swiftfin, Infuse, Kodi...) talk to the server as with any Jellyfin. Apps that show the server's own web pages (the official phone app, Jellyfin Media Player) show LCARS.
+- TV, phone and desktop apps (Android TV, Findroid, Swiftfin, Infuse, Kodi...) talk to the server as with any Jellyfin. Apps that show the server's own web pages (the official iPhone and Android apps, the LG TV app, Jellyfin Media Player) show LCARS, with their native hooks (the iPhone app's player, the TV remote).
 - On start the container installs LCARS's plugin (`plugin/`) into Jellyfin's plugins folder. It records transcode and storage history for Engineering → Diagnostics.
-- Tags: `latest`, `<jellyfin version>` (e.g. `12.4.0`, the newest LCARS on it), `<first 7 of the commit>` and `<jellyfin version>-<commit>`. Each Jellyfin release gets a new build within a day.
+- Tags: `latest`, and the Jellyfin version it's built on, e.g. `12.4` (the newest LCARS on Jellyfin 12.4.x). `12.4-<first 7 of the commit>` pins one build. Each Jellyfin release gets a new build within a day.
 
 ## How it works
 

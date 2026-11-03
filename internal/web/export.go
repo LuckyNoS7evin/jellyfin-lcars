@@ -48,6 +48,15 @@ func Export(fsys fs.FS, version, dir string) error {
 			return err
 		}
 	}
+	// Jellyfin's LG TV app reads start_url from web/manifest.json to find the web client (it won't
+	// connect without one); it's also what lets a phone add LCARS to its home screen.
+	if err := os.WriteFile(filepath.Join(dir, "manifest.json"), manifest("static/"+version+"/icon.svg"), 0o644); err != nil {
+		return err
+	}
+	// The server sends /robots.txt to web/robots.txt; jellyfin-web's says no to every crawler.
+	if err := os.WriteFile(filepath.Join(dir, "robots.txt"), []byte("User-agent: *\nDisallow: /\n"), 0o644); err != nil {
+		return err
+	}
 	// Relative asset URLs: index.html is /web/index.html (or /<base url>/web/...).
 	idx := a.render("static/"+version+"/", "same-origin", metaCSP(csp))
 	return os.WriteFile(filepath.Join(dir, "index.html"), idx, 0o644)
@@ -88,4 +97,11 @@ func inlineFonts(css []byte, a *assets) []byte {
 		}
 		return []byte(`url("data:font/woff2;base64,` + base64.StdEncoding.EncodeToString(f.data) + `")`)
 	})
+}
+
+// manifest is the web app manifest, with the icon at iconURL (relative to the manifest).
+func manifest(iconURL string) []byte {
+	return []byte(`{"name":"LCARS","short_name":"LCARS","start_url":"index.html#/home","display":"standalone",` +
+		`"background_color":"#000000","theme_color":"#000000",` +
+		`"icons":[{"src":"` + iconURL + `","sizes":"any","type":"image/svg+xml","purpose":"any"}]}` + "\n")
 }

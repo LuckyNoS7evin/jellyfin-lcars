@@ -73,7 +73,7 @@ export function wizard(ctx) {
 
   // 3. Libraries: a name, a type and folders each. Optional now; Engineering has the full editor.
   async function libraries() {
-    const { pickFolder } = await import('../admin/form.js');
+    const [{ pickFolder }, { prepareOptions }] = await Promise.all([import('../admin/form.js'), import('../admin/libraries.js')]);
     const list = h('div');
     async function drawList() {
       const libs = await api.get('/Library/VirtualFolders').catch(() => []);
@@ -101,7 +101,10 @@ export function wizard(ctx) {
         if (!n) { name.focus(); return; }
         if (!paths.length) { toast('No folders', 'Add at least one folder', 'red'); return; }
         try {
-          await api.post('/Library/VirtualFolders', { LibraryOptions: { PathInfos: paths.map(Path => ({ Path })) } },
+          // The official new-library defaults (watching for changes, the usual metadata providers...),
+          // as Engineering → Libraries → Add uses; each can be changed there later.
+          const avail = await api.get('/Libraries/AvailableOptions', { libraryContentType: type.value || undefined, isNewLibrary: true }).catch(() => ({}));
+          await api.post('/Library/VirtualFolders', { LibraryOptions: { ...prepareOptions(null, avail), PathInfos: paths.map(Path => ({ Path })) } },
             { name: n, collectionType: type.value || undefined, refreshLibrary: false, paths });
           name.value = ''; paths.length = 0; drawPaths(); drawList();
           toast('Library added', n, 'sky', 2000);

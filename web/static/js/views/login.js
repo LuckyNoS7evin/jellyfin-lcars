@@ -30,6 +30,7 @@ export function login(ctx) {
       msg.className = 'msg';
       msg.textContent = 'Verifying…';
       try {
+        app.adoptShell?.();
         await api.login(user.value.trim(), pass.value);
         msg.textContent = 'Access granted';
         app.start();
@@ -43,8 +44,73 @@ export function login(ctx) {
   },
   h('label.field', h('span', 'Username'), user),
   h('label.field', h('span', 'Password'), pass),
-  h('div.actions', submit, qcBtn),
+  h('div.actions', submit, qcBtn, btn('Forgot password', () => startReset(), { color: 'blue', ghost: true })),
   msg);
+
+  // ---- login disclaimer (Engineering → Branding) ----------------------------------------------
+  const disclaimer = h('p.login-disclaimer');
+  disclaimer.hidden = true;
+  api.get('/Branding/Configuration').then(b => {
+    if (b?.LoginDisclaimer?.trim()) { disclaimer.textContent = b.LoginDisclaimer.trim(); disclaimer.hidden = false; }
+  }).catch(() => {});
+
+  // ---- forgot password (official forgotpassword, forgotpasswordpin) ------------------------------
+  // The server writes a PIN to a file only its administrator can read, for a request made from
+  // the home network; the PIN then becomes the password, to be changed after signing in.
+  const resetBody = h('div');
+  const resetDeck = deck('Password reset', { color: 'blue', code: 'P-R' }, resetBody);
+  resetDeck.hidden = true;
+  function startReset() {
+    stopQuickConnect();
+    resetDeck.hidden = false;
+    const name = h('input.inp', { value: user.value.trim(), attrs: { autocomplete: 'username', autocapitalize: 'off', spellcheck: 'false', required: true } });
+    const rmsg = h('p.msg', { attrs: { role: 'status' } });
+    fill(resetBody, h('form', {
+      onsubmit: async e => {
+        e.preventDefault();
+        if (!name.value.trim()) { name.focus(); return; }
+        rmsg.className = 'msg'; rmsg.textContent = 'Requesting…';
+        let r;
+        try { r = await api.post('/Users/ForgotPassword', { EnteredUsername: name.value.trim() }); } catch (err) {
+          rmsg.className = 'msg bad';
+          rmsg.textContent = err.status === 403 ? 'A password can only be reset from the home network.' : `Unable to comply: ${err.message}`;
+          return;
+        }
+        if (r?.Action === 'ContactAdmin') { fill(resetBody, h('p.dlg-text', 'Ask the server’s administrator to reset your password.'), closeRow()); return; }
+        if (r?.Action === 'InNetworkRequired') { fill(resetBody, h('p.dlg-text', 'A password can only be reset from the home network.'), closeRow()); return; }
+        askPin(r);
+      },
+    }, h('p.dlg-text', 'The server will make a PIN for this account. Its administrator can find it on the server and give it to you.'),
+    h('label.field', h('span', 'Username'), name), h('div.actions', btn('Request a PIN', null, { type: 'submit', color: 'blue' }), btn('Cancel', () => { resetDeck.hidden = true; }, { color: 'lilac', ghost: true })), rmsg));
+    setTimeout(() => name.focus(), 0);
+  }
+  const closeRow = () => h('div.actions', btn('Close', () => { resetDeck.hidden = true; }, { color: 'lilac', ghost: true }));
+  function askPin(r) {
+    const pin = h('input.inp', { attrs: { autocomplete: 'one-time-code', spellcheck: 'false', autocapitalize: 'characters', required: true } });
+    const rmsg = h('p.msg', { attrs: { role: 'status' } });
+    const until = r?.PinExpirationDate ? new Date(r.PinExpirationDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    fill(resetBody, h('form', {
+      onsubmit: async e => {
+        e.preventDefault();
+        if (!pin.value.trim()) { pin.focus(); return; }
+        rmsg.className = 'msg'; rmsg.textContent = 'Verifying…';
+        try {
+          const res = await api.post('/Users/ForgotPassword/Pin', { Pin: pin.value.trim() });
+          const who = (res?.UsersReset || []).join(', ');
+          fill(resetBody, h('p.dlg-text', `Password reset${who ? ` for ${who}` : ''}. Sign in with the PIN as your password, then choose a new one in Settings.`), closeRow());
+          if (res?.UsersReset?.[0]) user.value = res.UsersReset[0];
+          pass.value = pin.value.trim();
+          pass.focus();
+        } catch (err) {
+          rmsg.className = 'msg bad';
+          rmsg.textContent = err.status === 404 ? 'That PIN doesn’t match a request (or it has expired).' : `Unable to comply: ${err.message}`;
+        }
+      },
+    }, h('p.dlg-text', 'The PIN has been written on the server, in:'), h('p.pin-file', r?.PinFile || ''),
+    h('p.dlg-text', `Ask the administrator for it${until ? ` (it works until ${until})` : ''}, then enter it here.`),
+    h('label.field', h('span', 'PIN'), pin), h('div.actions', btn('Reset password', null, { type: 'submit', color: 'blue' }), btn('Cancel', () => { resetDeck.hidden = true; }, { color: 'lilac', ghost: true })), rmsg));
+    setTimeout(() => pin.focus(), 0);
+  }
 
   // ---- Quick Connect (only when an admin has turned it on) ----------------------------------
   const qcBody = h('div.qc');
@@ -106,6 +172,8 @@ export function login(ctx) {
   return h('div.login',
     deck('Authorization required', { color: 'orange', code: '0-0-1' },
       users,
-      form),
+      form,
+      disclaimer),
+    resetDeck,
     qcDeck);
 }

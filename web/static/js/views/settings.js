@@ -9,6 +9,7 @@ import { SUBTITLE_DEFAULTS, UserSettings } from '../settings.js';
 import { libraryTabs } from './library.js';
 
 const BITRATES = [['Auto (no limit)', 0], ['120 Mbps', 120e6], ['60 Mbps', 60e6], ['40 Mbps', 40e6], ['20 Mbps', 20e6], ['10 Mbps', 10e6], ['8 Mbps', 8e6], ['4 Mbps', 4e6], ['2 Mbps', 2e6], ['1 Mbps', 1e6]];
+const MUSIC_BITRATES = [['As the files are', 0], ['320 kbps', 320e3], ['256 kbps', 256e3], ['192 kbps', 192e3], ['128 kbps', 128e3], ['96 kbps', 96e3], ['64 kbps', 64e3]];
 const SKIPS = [5, 10, 15, 20, 30, 45, 60, 90, 120].map(s => [`${s} seconds`, s * 1000]);
 const NEXTUP_DAYS = [['No limit', 0], ['30 days', 30], ['60 days', 60], ['90 days', 90], ['180 days', 180], ['365 days', 365], ['2 years', 730]];
 const SEGMENTS = [['Intro', 'Intro'], ['Outro', 'Outro / credits'], ['Recap', 'Recap'], ['Preview', 'Preview'], ['Commercial', 'Commercial']];
@@ -242,6 +243,7 @@ export async function settings(ctx) {
       row('Skip back', select(SKIPS, us.num('skipBackLength', 10000), v => savePref('skipBackLength', v))),
       row('Skip forward', select(SKIPS, us.num('skipForwardLength', 30000), v => savePref('skipForwardLength', v))),
       localRow('Maximum streaming bitrate', select(BITRATES, us.maxBitrate, v => { us.setLocal('maxBitrate', Number(v)); saved(); }), 'Above this, Jellyfin transcodes (this device)'),
+      localRow('Music quality', select(MUSIC_BITRATES, us.maxMusicBitrate, v => { us.setLocal('maxMusicBitrate', Number(v)); saved(); }), 'Songs above this are sent as mp3 at it, for mobile data (this device)'),
       localRow('Maximum resolution', select(RESOLUTIONS, us.local('maxVideoWidth', 0), v => { us.setLocal('maxVideoWidth', Number(v)); saved(); }), 'Transcodes are scaled down to this (this device)'),
       localRow('Limit direct play to that resolution', toggle(us.local('limitSupportedVideoResolution', false), on => { us.setLocal('limitSupportedVideoResolution', on); saved(); }),
         'Larger files are transcoded instead of played as they are (this device)'),

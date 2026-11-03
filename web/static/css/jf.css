@@ -736,3 +736,5 @@ a.np-title:hover, a.np-title:focus-visible { text-decoration: underline; outline
 .wiz-steps { margin: 0 0 14px; }
 .wiz-steps .tab { cursor: default; }
 .wiz-steps .tab.done { color: var(--dim); }
+.login-disclaimer { margin: 14px 0 0; color: var(--lilac); font-size: 15px; text-transform: none; white-space: pre-line; max-width: 70ch; }
+.pin-file { font-family: ui-monospace, monospace; font-size: 14px; color: var(--peach); word-break: break-all; margin: 4px 0 10px; text-transform: none; }

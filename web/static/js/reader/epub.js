@@ -1,6 +1,7 @@
 // EPUB reader: each chapter is laid out in columns inside a shadow root and turned a page
 // (one or two columns) at a time. The book's own CSS applies, scoped to the shadow root, with
 // the reader's font, size and colours on top. Scripts, forms and remote resources are dropped.
+import { native } from '../shell.js';
 import { h } from '../h.js';
 import { btn } from '../ui.js';
 import { IMAGE_RE } from './zip.js';
@@ -300,7 +301,7 @@ export async function epubEngine({ app, zip, stage, item, startTicks, onChange, 
     e.preventDefault();
     e.stopPropagation();
     const href = a.getAttribute('href');
-    if (/^https?:/i.test(href)) window.open(href, '_blank', 'noopener');
+    if (/^https?:/i.test(href)) native.openExternal(href);
     else if (!/^[a-z]+:/i.test(href)) goHref(href.startsWith('#') ? `${spine[ci].path}${href}` : resolve(dir(spine[ci].path), href));
   });
 

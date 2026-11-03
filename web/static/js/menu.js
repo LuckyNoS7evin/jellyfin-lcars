@@ -82,7 +82,7 @@ function showMenu(ctx, it, anchor, onChange) {
   const ud = it.UserData || (it.UserData = {});
   const policy = app.me?.Policy || {};
   const admin = !!policy.IsAdministrator;
-  const playable = ['Movie', 'Episode', 'Video', 'MusicVideo', 'Audio', 'Trailer'].includes(it.Type);
+  const playable = ['Movie', 'Episode', 'Video', 'MusicVideo', 'Audio', 'AudioBook', 'Trailer'].includes(it.Type);
   const pos = ud.PlaybackPositionTicks || 0;
   // The item tools (admin/edit.js), for admins; subtitles also for subtitle managers.
   const tool = t => () => { location.hash = `#/admin/edit/${it.Id}/${t}`; };
@@ -126,7 +126,8 @@ function showMenu(ctx, it, anchor, onChange) {
       try { await navigator.clipboard.writeText(url); toast('Copied', 'Stream link on the clipboard (it contains your access token)', 'sky'); }
       catch { toast('Unable to copy', 'The browser blocked clipboard access', 'red'); }
     }] : null,
-    it.CanDownload && playable ? ['Download', () => download(api, [it])] : null,
+    // Files: what plays, and books, audiobooks and photos (official title page "Download").
+    it.CanDownload && (playable || ['Book', 'AudioBook', 'Photo'].includes(it.Type)) ? ['Download', () => download(api, [it])] : null,
     // Official "Download all": every file under a series, season, collection or album.
     policy.EnableContentDownloading && ['Series', 'Season', 'BoxSet', 'MusicAlbum', 'Playlist'].includes(it.Type) ? ['Download all…', async () => {
       const files = (await app.playableItems(it)).filter(x => x.LocationType !== 'Virtual');
@@ -178,7 +179,7 @@ function showMenu(ctx, it, anchor, onChange) {
 // ---- actions ----------------------------------------------------------------------------------
 
 /** Start browser downloads one after another (browsers drop downloads started all at once). */
-function download(api, items) {
+export function download(api, items) {
   items.forEach((it, i) => setTimeout(() => {
     const a = h('a', { href: api.url(`/Items/${it.Id}/Download`, {}, { auth: true }), download: '' });
     document.body.append(a); a.click(); a.remove();

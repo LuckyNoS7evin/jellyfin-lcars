@@ -41,11 +41,16 @@
 //   setSecondarySubtitle(stream)   a second text subtitle at the top
 //   canPip, pip, togglePip()       picture-in-picture
 import { webEngine } from './engine-web.js';
+import { nativeEngine } from './engine-native.js';
+import { readyVideoPlugin } from '../shell.js';
 
 /**
- * The engine for this app: the browser's, until the desktop app supplies mpv.
+ * The engine for this app: the iPhone app's own player when it offers one and its setting is on
+ * (engine-native.js), otherwise the browser's (until the desktop app supplies mpv).
  * pb: the playback settings (settings.js `playback`), the same object every engine reads.
  */
 export function createEngine(app, pb) {
+  const p = readyVideoPlugin();
+  if (p && p.canPlayItem?.()) return nativeEngine(app, pb, p);
   return webEngine(app, pb);
 }

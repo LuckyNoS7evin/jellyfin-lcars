@@ -178,7 +178,7 @@ async function branding(ctx) {
     h('div.eng-col', deck('Sign-in page', { color: 'orange', num: 1 },
       h('p.dlg-note', 'For the official apps’ sign-in screens. LCARS doesn’t show these yet.'),
       row('Disclaimer', fo.text('LoginDisclaimer', { area: true }), 'Shown under the sign-in form'),
-      row('Custom CSS', fo.text('CustomCss', { area: true }), 'Added to the official web client'))),
+      row('Custom CSS', fo.text('CustomCss', { area: true }), 'For other apps that use it; LCARS keeps its own look'))),
     h('div.eng-col', deck('Splash screen', { color: 'sky', num: 2 },
       row('Show the splash screen', fo.toggle('SplashscreenEnabled'), 'While the TV and phone apps start'),
       splash, fileIn))), fo.bar];

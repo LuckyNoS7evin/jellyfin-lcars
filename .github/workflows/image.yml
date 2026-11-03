@@ -1,8 +1,7 @@
 # Tests, then builds Jellyfin with LCARS as its web client (Dockerfile) and pushes it to GHCR:
-#   ghcr.io/luckynos7evin/jellyfin-lcars:<jellyfin>-<first 7 of the commit>
-#   ghcr.io/luckynos7evin/jellyfin-lcars:<first 7 of the commit>   on the newest Jellyfin
-#   ghcr.io/luckynos7evin/jellyfin-lcars:<jellyfin>                the newest LCARS on that Jellyfin
 #   ghcr.io/luckynos7evin/jellyfin-lcars:latest
+#   ghcr.io/luckynos7evin/jellyfin-lcars:12.4              the newest LCARS on Jellyfin 12.4.x
+#   ghcr.io/luckynos7evin/jellyfin-lcars:12.4-<commit>     one build, to pin or roll back to
 # The commit is also the build version LCARS puts in its asset URLs (static/<version>/).
 # On every push to main, and each day: when Jellyfin has released since the last build, the daily
 # run builds on the new release, so a Jellyfin change that breaks LCARS shows up straight away.
@@ -60,6 +59,7 @@ jobs:
           curl -sf "https://api.nuget.org/v3-flatcontainer/jellyfin.controller/index.json" | jq -e --arg v "$version" '.versions | index($v)' >/dev/null \
             || { echo "Jellyfin.Controller $version isn't on NuGet yet"; exit 1; }
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "minor=$minor" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "Jellyfin $version, image $tag"
 
@@ -68,7 +68,7 @@ jobs:
           short=${GITHUB_SHA::7}
           image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/jellyfin-lcars
           echo "image=$image" >> "$GITHUB_OUTPUT"
-          echo "tags=$image:${{ steps.jf.outputs.version }}-$short,$image:$short,$image:${{ steps.jf.outputs.version }},$image:latest" >> "$GITHUB_OUTPUT"
+          echo "tags=$image:latest,$image:${{ steps.jf.outputs.minor }},$image:${{ steps.jf.outputs.minor }}-$short" >> "$GITHUB_OUTPUT"
           echo "short=$short" >> "$GITHUB_OUTPUT"
 
       - uses: docker/login-action@v3
@@ -80,7 +80,7 @@ jobs:
       # The daily run only builds when this commit hasn't been built on this Jellyfin yet.
       - id: need
         run: |
-          if [ "$GITHUB_EVENT_NAME" = schedule ] && docker manifest inspect "${{ steps.v.outputs.image }}:${{ steps.jf.outputs.version }}-${{ steps.v.outputs.short }}" >/dev/null 2>&1; then
+          if [ "$GITHUB_EVENT_NAME" = schedule ] && docker manifest inspect "${{ steps.v.outputs.image }}:${{ steps.jf.outputs.minor }}-${{ steps.v.outputs.short }}" >/dev/null 2>&1; then
             echo "build=false" >> "$GITHUB_OUTPUT"; echo "Already built"
           else
             echo "build=true" >> "$GITHUB_OUTPUT"

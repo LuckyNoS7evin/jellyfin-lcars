@@ -135,4 +135,10 @@ func TestExport(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, "static", "v1", "js", "a.js")); err != nil {
 		t.Error(err)
 	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "manifest.json")); !strings.Contains(string(b), `"start_url":"index.html#/home"`) {
+		t.Errorf("manifest.json: %q", b)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "robots.txt")); !strings.Contains(string(b), "Disallow: /") {
+		t.Errorf("robots.txt: %q", b)
+	}
 }

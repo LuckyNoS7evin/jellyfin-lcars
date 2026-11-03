@@ -36,6 +36,10 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.assets.serveIndex)
 	mux.HandleFunc("GET /static/", s.assets.serve)
+	mux.HandleFunc("GET /manifest.json", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/manifest+json")
+		w.Write(manifest("static/" + s.o.Version + "/icon.svg"))
+	})
 	mux.Handle("/jf/", http.StripPrefix("/jf", s.proxy))
 	return s.guard(mux)
 }

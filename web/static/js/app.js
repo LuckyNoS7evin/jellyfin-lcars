@@ -21,6 +21,8 @@ import { list } from './views/list.js';
 import { favourites } from './views/favourites.js';
 import { login } from './views/login.js';
 import { wizard } from './views/wizard.js';
+import { native, nativeVideoPlayer, exposeRouter } from './shell.js';
+import { tvSetup } from './tv.js';
 import { remote as remoteView } from './views/remote.js';
 import { quickConnect } from './views/quickconnect.js';
 import { Remote } from './remote.js';
@@ -159,7 +161,12 @@ const app = {
 
   /** Play anything: videos open the player, audio goes to the queue. */
   play(it, opts = {}) {
-    if (it.MediaType === 'Audio' || it.Type === 'Audio') { this.queue.play([it]); return; }
+    if (it.MediaType === 'Audio' || it.Type === 'Audio') {
+      // Audiobooks (and anything else with a position) resume where they were.
+      const startTicks = opts.startTicks ?? (opts.resume || it.Type === 'AudioBook' ? (it.UserData?.Played ? 0 : it.UserData?.PlaybackPositionTicks || 0) : 0);
+      this.queue.play([it], 0, { startTicks });
+      return;
+    }
     if (it.Type === 'Book') { this.read(it, opts); return; }
     if (this.remote.active) {
       // Play on another device: send it the same list, start point and tracks.
@@ -251,7 +258,7 @@ app.remote = new Remote(app);
 app.remote.on(() => { drawHeader(); drawRail(currentPath()); });
 
 // Cards: what their ▶ can play, and the ⋯ menu.
-const PLAYABLE_CARDS = new Set(['Movie', 'Episode', 'Video', 'MusicVideo', 'Trailer', 'Audio', 'MusicAlbum', 'MusicArtist', 'Playlist', 'Series', 'Season', 'Book']);
+const PLAYABLE_CARDS = new Set(['Movie', 'Episode', 'Video', 'MusicVideo', 'Trailer', 'Audio', 'AudioBook', 'MusicAlbum', 'MusicArtist', 'Playlist', 'Series', 'Season', 'Book']);
 setCardHooks({
   selectable,
   canPlay: it => PLAYABLE_CARDS.has(it.Type) && it.LocationType !== 'Virtual' && !it.IsPlaceHolder,
@@ -618,12 +625,66 @@ document.addEventListener('keydown', e => {
 // ---- router ---------------------------------------------------------------------------------
 
 let navCtrl = null;
+/**
+ * jellyfin-web's routes (official components/router/appRouter.js), as LCARS's: "#!/" and
+ * ".html" from older versions, details, the library pages, lists, search, settings, the
+ * dashboard. Returns the LCARS hash, or null when the path is already LCARS's.
+ */
+function legacyRoute(path, q) {
+  let p = path.replace(/^!/, '').replace(/\.html$/, '');
+  if (p !== path && ROUTES.some(([re]) => re.test(p))) return `#${p}${q.toString() ? `?${q}` : ''}`;
+  const id = v => (v || '').replace(/-/g, '').toLowerCase();
+  const isView = v => (app.views || []).some(x => x.Id === v);
+  const page = p.replace(/^\//, '');
+  switch (page) {
+    case 'details': {
+      const i = id(q.get('id'));
+      if (!/^[0-9a-f]{32}$/.test(i)) return '#/home';
+      return isView(i) ? `#/lib/${i}` : `#/item/${i}`;
+    }
+    case 'tv': case 'movies': case 'music': case 'books': case 'homevideos': case 'musicvideos': case 'boxsets': case 'playlists': case 'livetv': {
+      const i = id(q.get('topParentId') || q.get('parentId'));
+      return /^[0-9a-f]{32}$/.test(i) ? `#/lib/${i}` : '#/home';
+    }
+    case 'list': {
+      if (q.get('genre') || q.get('studio') || q.get('tag')) return null; // already ours
+      const out = new URLSearchParams();
+      if (q.get('genreId') || q.get('musicGenreId')) out.set('genre', q.get('genreId') || q.get('musicGenreId'));
+      else if (q.get('studioId')) out.set('studio', q.get('studioId'));
+      else if (q.get('type') === 'tag' && q.get('tag')) out.set('tag', q.get('tag'));
+      else if (q.get('parentId')) { const i = id(q.get('parentId')); return isView(i) ? `#/lib/${i}` : `#/item/${i}`; }
+      else return '#/home';
+      if (q.get('musicGenreId')) out.set('type', 'MusicAlbum');
+      return `#/list?${out}`;
+    }
+    case 'search':
+      return q.get('query') && !q.get('q') ? `#/search?q=${encodeURIComponent(q.get('query'))}` : null;
+    case 'mypreferencesmenu': case 'mypreferencesdisplay': case 'mypreferenceshome': case 'mypreferencesplayback':
+    case 'mypreferencessubtitles': case 'mypreferencescontrols': case 'mypreferencesquickconnect': case 'userprofile':
+      return '#/settings';
+    case 'video': case 'nowplaying': return '#/queue';
+    case 'login': case 'selectserver': case 'addserver': case 'wizard': case 'wizardstart': case 'startup': case 'forgotpassword': case 'forgotpasswordpin':
+      return '#/home';
+    case 'configurationpage': {
+      const n = q.get('name');
+      return n ? `#/admin/plugins/settings/${encodeURIComponent(n)}` : '#/admin/plugins';
+    }
+    default:
+      if (page === 'dashboard' || page.startsWith('dashboard/')) return '#/admin';
+      return null;
+  }
+}
+
 const currentPath = () => (location.hash.slice(1) || '/home').split('?')[0];
 
 async function route({ keepScroll = false } = {}) {
   if (!app.api.authed) { showLogin(); return; }
   const raw = location.hash.slice(1) || '/home';
   const [path, qs = ''] = raw.split('?');
+  adoptShell(); // the LG app's shell may have arrived since the last page
+  // Links in jellyfin-web's form (bookmarks, shared links, other apps' "open in Jellyfin").
+  const old = legacyRoute(path, new URLSearchParams(qs));
+  if (old) { location.replace(old); return; }
   let match = null;
   for (const [re, view, names = []] of ROUTES) {
     const m = path.match(re);
@@ -872,7 +933,51 @@ function showLogin(username = '') {
   }).catch(() => fill(mainEl, login({ api: app.api, app, setTitle, username })));
 }
 
+/**
+ * Inside Jellyfin's iPhone or LG TV app: its name for the device in the server's device list,
+ * its player plugins (the iPhone's native player), and the router hooks its Home tab uses. The
+ * LG app adds its shell after the page starts, so this runs again at each sign-in and start.
+ */
+function adoptShell() {
+  if (!native.present) return;
+  const name = native.deviceName();
+  if (name) app.api.device = name;
+  nativeVideoPlayer({ onStop: () => app.player?.close?.() }).catch(() => {});
+}
+app.adoptShell = adoptShell;
+exposeRouter({
+  canGoBack: () => !app.player && canGoBack(currentPath()),
+  back: () => { if (app.player) app.player.close(); else goBack(); },
+  goHome: () => { app.player?.close?.(); location.hash = '#/home'; },
+});
+/** A remote's media keys: the video player or reader takes them as its own keys, else music. */
+app.mediaKey = what => {
+  const p = app.player;
+  if (p?.kind === 'video') {
+    ({ play: p.play, pause: p.pause, playpause: p.toggle, stop: p.close, next: p.next, previous: p.prev,
+      rewind: () => p.seekBy(-(app.us?.skipBack || 10)), fastforward: () => p.seekBy(app.us?.skipForward || 30) }[what])?.();
+    return;
+  }
+  if (p) return; // the reader: its own keys
+  const q = app.queue;
+  if (!q?.current) return;
+  if (what === 'play') q.el.play().catch(() => {});
+  else if (what === 'pause') q.pause();
+  else if (what === 'playpause') q.toggle();
+  else if (what === 'stop') q.stop();
+  else if (what === 'next' || what === 'fastforward') q.next();
+  else if (what === 'previous' || what === 'rewind') q.prev();
+};
+tvSetup(app, { canGoBack: () => canGoBack(currentPath()), goBack });
+// Inside the iPhone app, links that open a new tab do nothing; its own browser opens them.
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('a[href][target=_blank]');
+  if (!a || !native.present || native.supports('targetblank')) return;
+  if (native.openUrl(a.href)) e.preventDefault();
+}, true);
+
 async function start() {
+  adoptShell();
   if (!app.api.authed) { showLogin(); return; }
   drawHeader();
   drawFoot();

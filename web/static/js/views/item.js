@@ -1,5 +1,6 @@
 // Details for any item: films and episodes (play, tracks, cast), series and seasons
 // (episodes), albums and artists (tracks), collections, playlists and people.
+import { native } from '../shell.js';
 import { h, fill } from '../h.js';
 import { Api, TICKS } from '../api.js';
 import * as f from '../fmt.js';
@@ -8,7 +9,7 @@ import {
   canMarkPlayed, canRate,
 } from '../ui.js';
 import { themeFor } from '../player/theme.js';
-import { menuButton, canManageCollections } from '../menu.js';
+import { menuButton, canManageCollections, download } from '../menu.js';
 import { addSelectAction } from '../select.js';
 
 /** Where Back goes when there's no history: one level up. */
@@ -185,7 +186,7 @@ function trailerButton(ctx, it) {
   }
   const remote = (it.RemoteTrailers || []).filter(t => /^https?:/i.test(t.Url));
   if (!remote.length) return null;
-  return btn('Trailer ↗', () => window.open(remote[0].Url, '_blank', 'noopener,noreferrer'), { color: 'blue', title: remote[0].Name || 'Trailer' });
+  return btn('Trailer ↗', () => native.openExternal(remote[0].Url), { color: 'blue', title: remote[0].Name || 'Trailer' });
 }
 
 /** After a menu action on a title page: leave if it was deleted, else redraw. */
@@ -716,6 +717,13 @@ async function person(ctx, it) {
 function bookButtons(ctx, it) {
   const ud = it.UserData || {};
   const pos = ud.Played ? 0 : ud.PlaybackPositionTicks || 0;
+  // Audiobooks play in the music player, from where they were.
+  if (it.Type === 'AudioBook') {
+    return [
+      btn(pos > 0 ? `Continue · ${f.clock(pos / 1e7)}` : 'Listen', () => ctx.app.play(it, { resume: true }), { color: 'orange' }),
+      pos > 0 ? btn('From the start', () => ctx.app.play(it, { startTicks: 0 }), { color: 'peach' }) : null,
+    ].filter(Boolean);
+  }
   const where = it.RunTimeTicks === 10000000 ? `${Math.round(pos / 100000)}%` : `page ${Math.round(pos / 10000) + 1}`;
   return [
     btn(pos > 0 ? `Continue · ${where}` : 'Read', () => ctx.app.read(it), { color: 'orange' }),
@@ -744,7 +752,7 @@ const GROUP_LABELS = { Movie: 'Films', Series: 'Series', Season: 'Seasons', Epis
 
 async function folder(ctx, it) {
   const { api, signal } = ctx;
-  const isBook = it.Type === 'Book';
+  const isBook = it.Type === 'Book' || it.Type === 'AudioBook';
   // On a collection page, multi-select can take things out of it.
   if (it.Type === 'BoxSet' && canManageCollections(ctx.app.me)) {
     const off = addSelectAction({
@@ -774,6 +782,8 @@ async function folder(ctx, it) {
       actions,
       // Collections play in release order, like the official client.
       it.Type === 'BoxSet' ? btn('Play all', async () => ctx.app.playList(await ctx.app.playableItems(it), 0, { resume: true }), { color: 'orange' }) : null,
-      ...toggles(ctx, it), isBook ? null : menuButton(ctx, it, { small: false, onChange: afterMenu(ctx) })].filter(Boolean) })),
+      // Books, as official: a Download button beside Read when the user may download.
+      isBook && it.CanDownload ? btn('Download', () => download(ctx.api, [it]), { color: 'lilac', ghost: true }) : null,
+      ...toggles(ctx, it), menuButton(ctx, it, { small: false, onChange: afterMenu(ctx) })].filter(Boolean) })),
     children);
 }

@@ -237,7 +237,7 @@ async function editLibrary(ctx, itemId) {
 }
 
 /** The library's options with every type the server offers filled in (official defaults). */
-function prepareOptions(opts, avail) {
+export function prepareOptions(opts, avail) {
   const o = JSON.parse(JSON.stringify(opts || {}));
   o.TypeOptions = o.TypeOptions || [];
   for (const t of avail.TypeOptions || []) {
@@ -250,7 +250,7 @@ function prepareOptions(opts, avail) {
     if (!to.ImageOptions?.length) to.ImageOptions = JSON.parse(JSON.stringify(t.DefaultImageOptions || []));
   }
   // New libraries: the official defaults.
-  if (opts == null) Object.assign(o, { Enabled: true, EnableRealtimeMonitor: true, EnableInternetProviders: true, SaveLocalMetadata: false,
+  if (opts == null) Object.assign(o, { Enabled: true, EnableRealtimeMonitor: true, EnableLUFSScan: true, EnableInternetProviders: true, SaveLocalMetadata: false,
     EnableEmbeddedTitles: false, EnableEmbeddedExtrasTitles: false, EnableEmbeddedEpisodeInfos: false, AllowEmbeddedSubtitles: 'AllowAll',
     EnableChapterImageExtraction: false, ExtractChapterImagesDuringLibraryScan: false, EnableTrickplayImageExtraction: false,
     ExtractTrickplayImagesDuringLibraryScan: false, AutomaticRefreshIntervalDays: 0, SeasonZeroDisplayName: 'Specials',

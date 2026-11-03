@@ -183,6 +183,7 @@ async function metadata(ctx, item) {
     ctypeSel ? row('Content type', ctypeSel, 'What kind of media this folder holds') : null,
     row(person ? 'Name' : 'Title', fo.text('Name')),
     show(['Series', 'Season', 'Episode', 'Movie', 'Trailer', 'Person'].includes(T), row(person ? 'Original name' : 'Original title', fo.text('OriginalTitle'))),
+    show(T === 'Series' || item.MediaType === 'Video', row('Original language', fo.select('OriginalLanguage', [['Not set', ''], ...langs.slice(1)]), 'The language it was made in')),
     row('Sort name', fo.text('ForcedSortName', { placeholder: item.SortName || '' }), 'Empty: the server works it out'),
     show(T === 'Episode' || T === 'Season' || T === 'Audio', row(T === 'Audio' ? 'Disc number' : 'Season number', fo.num('ParentIndexNumber', { min: 0, zero: null }))),
     show(T === 'Episode' || T === 'Audio' || T === 'Season', row(T === 'Audio' ? 'Track number' : T === 'Season' ? 'Season number' : 'Episode number', fo.num('IndexNumber', { min: 0, zero: null }))),

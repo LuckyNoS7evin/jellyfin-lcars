@@ -9,6 +9,7 @@ import * as f from '../fmt.js';
 import { btn, arrow, tag, toast, epCode, image, pickImage, seg, volumeBar } from '../ui.js';
 import { Reporter, playbackInfo } from './report.js';
 import { createEngine } from './engine.js';
+import { native } from '../shell.js';
 
 const QUALITIES = [
   ['Auto', 0], ['60 Mbps', 60e6], ['40 Mbps', 40e6], ['20 Mbps', 20e6], ['10 Mbps', 10e6],
@@ -764,6 +765,7 @@ export function playVideo(app, item, opts = {}) {
     clearTimeout(osdTimer);
     if (reporter) await reporter.stop();
     eng.destroy();
+    if (eng.kind !== 'native') native.disableFullscreen();
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     root.remove();
     document.removeEventListener('keydown', onKey, true);
@@ -864,6 +866,14 @@ export function playVideo(app, item, opts = {}) {
     input();
     unmuteOnInput();
     const k = e.key;
+    // A TV remote: up and down move between the controls (the TV has its own volume), and
+    // left and right do too once a control has focus; OK on the picture plays or pauses.
+    if (app.tv) {
+      const onCtl = !!e.target.closest?.('.p-ui button, .p-ui [tabindex], .p-menu button');
+      if (k === 'ArrowUp' || k === 'ArrowDown') { poke(); if (!onCtl) { (root.querySelector('.p-btns button') || root.querySelector('.p-ui button'))?.focus(); e.preventDefault(); e.stopPropagation(); } return; }
+      if ((k === 'ArrowLeft' || k === 'ArrowRight') && onCtl) { poke(); return; }
+      if (k === 'Enter' && !onCtl && askEl.hidden && !(askSeg && !skipEl.hidden) && upNext !== 'shown') { toggle(); e.preventDefault(); e.stopPropagation(); poke(); return; }
+    }
     // While asking "Are you still watching?", only its buttons (and Esc for Stop) work.
     if (!askEl.hidden) {
       if (k === 'Escape') { askEl.querySelector('.c-red')?.click(); e.preventDefault(); e.stopPropagation(); }
@@ -903,6 +913,9 @@ export function playVideo(app, item, opts = {}) {
   const tick = setInterval(() => { if (!closed) drawTime(); }, 500);
 
   document.body.append(root);
+  // In the iPhone app this hides its tab bar and turns the phone to landscape (its own player,
+  // when that's in use, does this itself).
+  if (eng.kind !== 'native') native.enableFullscreen();
   drawTitle();
   drawInfo();
   drawButtons();

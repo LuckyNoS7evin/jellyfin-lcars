@@ -78,9 +78,9 @@ export class AudioQueue {
    * Replace the queue. A new queue plays in order unless it comes from a Shuffle button
    * (shuffle: true); the shuffle toggle then works on that queue.
    */
-  play(items, index = 0, { shuffle = false } = {}) {
+  play(items, index = 0, { shuffle = false, startTicks = 0 } = {}) {
     // Playing on another device (remote.js): it gets the tracks instead.
-    if (this.app.remote?.active) { this.app.remote.play(items.filter(isAudio), { index, shuffle }); return; }
+    if (this.app.remote?.active) { this.app.remote.play(items.filter(isAudio), { index, shuffle, startTicks }); return; }
     const list = items.filter(isAudio).map(entry);
     if (!list.length) return;
     index = Math.max(0, Math.min(index, list.length - 1));
@@ -93,6 +93,8 @@ export class AudioQueue {
       this.sorted = null;
       this.items = list;
     }
+    // Where the first track starts (an audiobook resuming); later tracks start at the beginning.
+    this.startAt = startTicks > 0 ? startTicks / 1e7 : 0;
     this.playAt(index);
   }
 
@@ -176,12 +178,17 @@ export class AudioQueue {
     const c = caps();
     const containers = ['mp3', 'aac,m4a|aac', 'm4b|aac', c.flac && 'flac', c.opus && 'opus,webm|opus,ogg|opus', c.vorbis && 'ogg|vorbis,webm|vorbis', 'wav'].filter(Boolean);
     const playSessionId = rid();
+    // A music quality limit makes the server send mp3 at that bitrate when a file is above it.
+    const limit = this.app.us?.maxMusicBitrate || 0;
     this.el.src = this.api.url(`/Audio/${it.Id}/universal`, {
       UserId: this.api.userId, DeviceId: this.api.deviceId, PlaySessionId: playSessionId,
-      MaxStreamingBitrate: 140_000_000, Container: containers.join(','),
+      MaxStreamingBitrate: limit || 140_000_000, AudioBitRate: limit || undefined, Container: containers.join(','),
       TranscodingContainer: 'mp3', TranscodingProtocol: 'http', AudioCodec: 'mp3', EnableRedirection: true, EnableRemoteMedia: false,
     }, { auth: true });
     this.started = false;
+    const from = this.startAt || 0;
+    this.startAt = 0;
+    if (from > 0) this.el.addEventListener('loadedmetadata', () => { try { this.el.currentTime = from; } catch { /* not seekable */ } }, { once: true });
     this.reporter = new Reporter(this.api, {
       itemId: it.Id, mediaSourceId: it.Id, playSessionId, playMethod: 'DirectPlay',
       playlistIndex: i, playlistLength: this.items.length, playlistItemId: it._qid,

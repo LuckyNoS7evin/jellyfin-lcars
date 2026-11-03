@@ -5,7 +5,10 @@ import { Api } from '../api.js';
 import { deck, card, errorBox, colorAt, loading } from '../ui.js';
 
 const DEFAULT_ORDER = ['smalllibrarytiles', 'resume', 'resumeaudio', 'resumebook', 'livetv', 'nextup', 'latestmedia'];
-const LATEST_TYPES = { movies: 'Movie', tvshows: 'Episode', music: 'MusicAlbum', homevideos: 'Video', musicvideos: 'MusicVideo', books: 'Book' };
+// Latest for every library but these (official recentlyAdded.ts); a library type not listed in
+// LATEST_TYPES (mixed films and shows) gets whatever was added.
+const NO_LATEST = new Set(['playlists', 'livetv', 'boxsets', 'channels', 'folders']);
+const LATEST_TYPES = { movies: 'Movie', tvshows: 'Episode', music: 'MusicAlbum', homevideos: 'Video,Photo', musicvideos: 'MusicVideo', books: 'Book,AudioBook' };
 
 export async function home(ctx) {
   const { api, app, signal } = ctx;
@@ -55,7 +58,7 @@ export async function home(ctx) {
     resumebook: () => slot('Continue reading', () => resume('Book')),
     nextup: () => slot('Next up', () => api.get('/Shows/NextUp', { userId: api.userId, limit: 16, fields, ...images, enableResumable: false, ...app.us.nextUpQuery() }, { signal }).then(r => r.Items),
       { cls: 'wide', opts: { shape: 'wide', episodeImages, onPlay: i => app.play(i) } }),
-    latestmedia: () => views.filter(v => LATEST_TYPES[v.CollectionType] && !excluded.has(v.Id)).map(v => slot(`Latest · ${v.Name}`,
+    latestmedia: () => views.filter(v => !NO_LATEST.has(v.CollectionType) && !excluded.has(v.Id)).map(v => slot(`Latest · ${v.Name}`,
       () => api.get('/Items/Latest', { userId: api.userId, parentId: v.Id, limit: 24, fields, groupItems: true, includeItemTypes: LATEST_TYPES[v.CollectionType], ...images }, { signal }),
       v.CollectionType === 'music' ? { cls: 'square' } : null)),
   };

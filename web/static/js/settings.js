@@ -91,6 +91,8 @@ export class UserSettings {
   get backdrops() { return this.local('backdrops', false); }
   get detailsBanner() { return this.local('detailsBanner', true); }
   get maxBitrate() { return this.local('maxBitrate', 0); }
+  // Music over the internet (official "Music quality"): 0 is as the files are.
+  get maxMusicBitrate() { return this.local('maxMusicBitrate', 0); }
   get episodeImages() { return this.bool('useEpisodeImagesInNextUpAndResume', false); }
   get skipBack() { return this.num('skipBackLength', 10000) / 1000; }
   get skipForward() { return this.num('skipForwardLength', 30000) / 1000; }

@@ -80,7 +80,7 @@ const TYPES = {
   // Books libraries are folders of series; browse those like the official client.
   books: [
     { id: 'series', label: 'Series', folders: true, sorts: ['name', 'added'], groups: [STATUS] },
-    { id: 'books', label: 'All books', types: 'Book', pref: 'books', sorts: ['name', 'added', 'released', 'year', 'random'], groups: [STATUS], dynamic: true },
+    { id: 'books', label: 'All books', types: 'Book,AudioBook', pref: 'books', sorts: ['name', 'added', 'released', 'year', 'random'], groups: [STATUS], dynamic: true },
   ],
   playlists: [{ id: 'lists', label: 'Playlists', types: 'Playlist', folders: true, sorts: ['name', 'added'], groups: [] }],
   default: [{ id: 'all', label: 'Contents', folders: true, sorts: ['name', 'added'], groups: [STATUS] }],
