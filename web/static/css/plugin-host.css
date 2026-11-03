@@ -1,0 +1,97 @@
+/* Plugin settings pages inside the admin dashboard: jellyfin-web's form markup (inputContainer,
+   checkboxContainer, selectContainer, emby-button...) drawn the LCARS way, in the engineering
+   palette. The pages bring their own layout; this gives the pieces LCARS's look. */
+@font-face { font-family: "Antonio"; src: url("../fonts/antonio-latin-400-normal.woff2") format("woff2"); font-weight: 400; }
+@font-face { font-family: "Antonio"; src: url("../fonts/antonio-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+:root {
+  --orange: #d2761f; --peach: #d9a473; --lilac: #a8829f; --blue: #9999ff; --sky: #99ccff; --salmon: #c0643a; --red: #b3524a;
+  --alert: #ff2a1a; --dim: #5a5470; --text: #d9a473; --edge: var(--blue); --seg: 30px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #000; color: var(--text); }
+* { scrollbar-color: var(--dim) #000; }
+body { font: 400 17px/1.35 "Antonio", "Arial Narrow", sans-serif; letter-spacing: .02em; padding: 4px 2px 24px; }
+a { color: var(--sky); }
+h1, h2, h3, h4, .sectionTitle { font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--orange); margin: 18px 0 8px; }
+h1 { font-size: 30px; } h2, .sectionTitle { font-size: 24px; } h3 { font-size: 19px; color: var(--lilac); } h4 { font-size: 17px; color: var(--lilac); }
+p { margin: 6px 0; }
+hr { border: 0; border-top: 1px solid #1b1a26; margin: 16px 0; }
+.hide, [hidden] { display: none !important; }
+.content-primary, .readOnlyContent { max-width: none; overflow-x: auto !important; }
+.verticalSection { margin: 0 0 20px; }
+.verticalSection-extrabottompadding { padding-bottom: 12px; }
+.sectionTitleContainer { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* fields */
+.inputContainer, .selectContainer, .inputContainer-withIcon { margin: 0 0 16px; display: grid; gap: 4px; }
+.inputLabel, .selectLabel, label.inputLabel, .textareaLabel { color: var(--peach); font-size: 16px; text-transform: uppercase; letter-spacing: .05em; }
+.fieldDescription { color: var(--lilac); font-size: 14px; letter-spacing: .01em; }
+input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea {
+  width: 100%; min-height: 36px; background: #000; color: var(--peach); border: 2px solid var(--edge); border-radius: 18px;
+  padding: 0 14px .13em; font: 400 16px "Antonio", sans-serif; letter-spacing: .04em;
+}
+textarea { padding: 8px 14px; border-radius: 16px; min-height: 6em; resize: vertical; }
+input:focus, select:focus, textarea:focus { outline: none; --edge: var(--orange); }
+select { appearance: none; -webkit-appearance: none; padding-right: calc(var(--seg) + 12px); text-transform: uppercase;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M0 0h12L6 8z'/%3E%3C/svg%3E") no-repeat right 9px center / 12px 8px,
+    linear-gradient(to left, var(--edge) var(--seg), #000 var(--seg)); }
+input[type=date], input[type=datetime-local], input[type=time] { width: auto; padding: 0 6px .13em 14px !important; color-scheme: dark;
+  background: linear-gradient(to left, var(--edge) var(--seg), #000 var(--seg)) !important; }
+input[type=date]::-webkit-calendar-picker-indicator, input[type=datetime-local]::-webkit-calendar-picker-indicator { filter: brightness(0); cursor: pointer; margin-left: 10px; padding: 4px; }
+select:not([multiple]) { width: auto; min-width: 140px; }
+.inputContainer select, .selectContainer select, .inputContainer input:not([type=checkbox]):not([type=radio]) { width: 100%; }
+select option { background: #000; color: var(--peach); }
+select[multiple] { min-height: 8em; background: #000; padding: 6px 10px; }
+
+/* checkboxes: a switch-like pill */
+.selectArrowContainer, .checkboxOutline, .emby-checkbox-label > .material-icons { display: none !important; }
+.checkboxContainer, .checkboxList > label, .emby-checkbox-label, label:has(> input[type=checkbox]) { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; cursor: pointer; }
+/* checkboxes a page puts side by side, outside a container (Playback Reporting's filters) */
+span > .emby-checkbox-label, td > .emby-checkbox-label { display: inline-flex; margin: 4px 18px 4px 0; line-height: 1.35 !important; }
+input[type=checkbox] { appearance: none; -webkit-appearance: none; width: 46px; height: 24px; flex: none; margin: 0; border-radius: 12px;
+  border: 2px solid var(--dim); background: transparent; position: relative; cursor: pointer; }
+input[type=checkbox]::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--dim); transition: left .15s; }
+input[type=checkbox]:checked { background: var(--orange); border-color: var(--orange); }
+input[type=checkbox]:checked::after { left: 25px; background: #000; }
+input[type=checkbox]:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.checkboxLabel, .checkboxContainer span { color: var(--peach); }
+.checkboxListContainer, .checkboxList { display: grid; gap: 4px; }
+input[type=radio] { accent-color: var(--orange); }
+
+/* buttons */
+button, .raised, .button-submit, .emby-button, input[type=submit] {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 0 18px; margin: 4px 6px 4px 0;
+  border: 0; border-radius: 18px; background: var(--lilac); color: #000; font: 700 16px "Antonio", sans-serif; text-transform: uppercase;
+  letter-spacing: .05em; cursor: pointer; }
+.button-submit, button[type=submit], input[type=submit] { background: var(--orange); }
+.button-delete, .btnDelete { background: transparent; color: var(--red); box-shadow: inset 0 0 0 2px var(--red); }
+button:hover, .raised:hover, .button-submit:hover { filter: brightness(1.2); }
+button:disabled { opacity: .45; cursor: default; filter: none; }
+.material-icons { font-family: inherit; font-size: 0; }
+.material-icons::before { font-size: 16px; content: "•"; }
+.paper-icon-button-light { min-height: 32px; width: 32px; padding: 0; border-radius: 50%; }
+
+/* lists and tables some pages use */
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #1b1a26; }
+th { color: var(--lilac); font-weight: 400; text-transform: uppercase; font-size: 14px; letter-spacing: .06em; }
+.listItem { padding: 8px 0; border-bottom: 1px solid #1b1a26; }
+td { vertical-align: middle; }
+table.paperList td, table.paperList th { border-bottom: 0; color: var(--peach); text-transform: uppercase; font-size: 16px; letter-spacing: .05em; }
+.selectContainer:has(> select:not([label])) { margin: 0 !important; display: block; }
+canvas { max-width: 100%; }
+/* controls laid out in table cells (report filters): their own size, not the cell's */
+td > input:not([type=checkbox]):not([type=radio]), td > select, td > .selectContainer > select { width: auto !important; min-width: 140px; }
+
+/* the plugin's own tabs (pages that call LibraryMenu.setTabs) */
+.lcars-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.lcars-tabs a { display: inline-flex; align-items: center; min-height: 32px; padding: 0 16px .1em; border-radius: 16px; background: var(--lilac); color: #000;
+  font-weight: 700; font-size: 16px; text-transform: uppercase; letter-spacing: .05em; text-decoration: none; }
+.lcars-tabs a.on { background: var(--orange); }
+.lcars-tabs a:hover { filter: brightness(1.2); }
+details { margin: 8px 0; } summary { color: var(--sky); cursor: pointer; }
+code, pre { font-family: ui-monospace, monospace; font-size: 14px; color: var(--peach); }
+
+.lcars-loading { color: var(--lilac); padding: 12px 0; }
+.lcars-busy { position: fixed; inset: 0; display: grid; place-items: center; background: #000a; color: var(--orange); font-size: 22px; letter-spacing: .1em; text-transform: uppercase; z-index: 100; }

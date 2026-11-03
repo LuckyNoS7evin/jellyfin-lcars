@@ -137,6 +137,11 @@ func (a *assets) serve(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	// Fonts are fetched in CORS mode, and the plugin settings sandbox (plugin-host.html) has an
+	// opaque origin, so it can only use Antonio if the font says anyone may. Fonts are public.
+	if strings.HasPrefix(file, "fonts/") {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+	}
 	if ver == a.version && a.version != "dev" && !strings.HasSuffix(a.version, "-dirty") {
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	} else {

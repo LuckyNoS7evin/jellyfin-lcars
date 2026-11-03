@@ -50,8 +50,17 @@ func (s *Server) Handler() http.Handler {
 // 'wasm-unsafe-eval' lets the subtitle renderers (libass, libbitsub) compile WebAssembly;
 // it does not allow eval() of JavaScript.
 const csp = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob: https:; " +
-	"media-src 'self' blob:; worker-src 'self' blob:; font-src 'self'; connect-src 'self'; " +
+	"media-src 'self' blob:; worker-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-src 'self'; " +
 	"manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+
+// pluginHostCSP is for plugin-host.html, where the admin dashboard runs a plugin's own settings
+// page. Those pages are HTML with inline scripts (written for jellyfin-web), so inline scripts
+// and styles are allowed here, and only here. The sandbox directive gives the page an opaque
+// origin even if opened on its own: it can't read LCARS's storage or token, and it can't fetch
+// anything itself (connect-src 'none'); it asks the dashboard, by postMessage, to make API calls.
+const pluginHostCSP = "default-src 'none'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; " +
+	"img-src 'self' data: blob: https:; font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; " +
+	"frame-ancestors 'self'; sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals"
 
 // maxBody caps request bodies sent through to Jellyfin (playback reports, logins, settings).
 // Uploads get maxUpload: item images, subtitles, lyrics, the splash screen and avatars.
@@ -75,7 +84,10 @@ func (s *Server) guard(next http.Handler) http.Handler {
 		hd := w.Header()
 		hd.Set("X-Content-Type-Options", "nosniff")
 		hd.Set("Referrer-Policy", "no-referrer")
-		if !strings.HasPrefix(r.URL.Path, "/jf/") {
+		if strings.HasSuffix(r.URL.Path, "/plugin-host.html") {
+			hd.Set("Content-Security-Policy", pluginHostCSP)
+			hd.Set("X-Frame-Options", "SAMEORIGIN")
+		} else if !strings.HasPrefix(r.URL.Path, "/jf/") {
 			hd.Set("Content-Security-Policy", csp)
 			hd.Set("X-Frame-Options", "DENY")
 			hd.Set("Cross-Origin-Opener-Policy", "same-origin")

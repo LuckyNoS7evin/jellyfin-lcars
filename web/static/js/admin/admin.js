@@ -14,6 +14,7 @@ export const SECTIONS = [
   { id: 'playback', label: 'Playback', n: 'E-04', color: 'peach', load: () => import('./playback.js').then(m => m.playback) },
   { id: 'ops', label: 'Operations', n: 'E-05', color: 'blue', load: () => import('./ops.js').then(m => m.ops) },
   { id: 'server', label: 'Server', n: 'E-06', color: 'salmon', load: () => import('./server.js').then(m => m.server) },
+  { id: 'plugins', label: 'Plugins', n: 'E-07', color: 'sky', load: () => import('./plugins.js').then(m => m.plugins) },
   // Item tools (A8), opened from an item's ⋯ menu rather than the rail. Subtitle managers who
   // aren't admins may use the subtitle tool.
   { id: 'edit', hidden: true, load: () => import('./edit.js').then(m => m.edit),

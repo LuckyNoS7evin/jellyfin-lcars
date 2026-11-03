@@ -158,3 +158,22 @@ func TestForwardedFor(t *testing.T) {
 		t.Errorf("via proxy: proto %q host %q", got.Header.Get("X-Forwarded-Proto"), got.Header.Get("X-Forwarded-Host"))
 	}
 }
+
+func TestPluginHostCSP(t *testing.T) {
+	up := httptest.NewServer(http.NotFoundHandler())
+	defer up.Close()
+	h := newTestServer(t, up)
+	w := do(h, "GET", "/static/abc123/plugin-host.html", "", nil)
+	c := w.Header().Get("Content-Security-Policy")
+	if !strings.Contains(c, "'unsafe-inline'") || !strings.Contains(c, "sandbox") || !strings.Contains(c, "connect-src 'none'") {
+		t.Errorf("plugin host CSP %q", c)
+	}
+	if w.Header().Get("X-Frame-Options") != "SAMEORIGIN" {
+		t.Errorf("plugin host X-Frame-Options %q", w.Header().Get("X-Frame-Options"))
+	}
+	// Everything else keeps the strict policy.
+	w = do(h, "GET", "/", "", nil)
+	if c := w.Header().Get("Content-Security-Policy"); strings.Contains(c, "'unsafe-inline'") || !strings.Contains(c, "frame-src 'self'") {
+		t.Errorf("main CSP %q", c)
+	}
+}
