@@ -29,7 +29,7 @@ func TestPreloadFollowsStaticImportsOnly(t *testing.T) {
 	if !strings.Contains(idx, `<link rel="modulepreload" href="/static/v1/js/views/x.js">`) || strings.Contains(idx, "{{") {
 		t.Errorf("index.html not filled in:\n%s", idx)
 	}
-	if w := a.files["/vendor/v.wasm"]; w.gz == nil || w.ctype != "application/wasm" {
-		t.Errorf("wasm: gz=%v ctype=%q", w.gz != nil, w.ctype)
+	if w := a.files["/vendor/v.wasm"]; w.ctype != "application/wasm" {
+		t.Errorf("wasm ctype=%q", w.ctype)
 	}
 }

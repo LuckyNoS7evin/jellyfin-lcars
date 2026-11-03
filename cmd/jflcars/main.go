@@ -1,4 +1,5 @@
-// Command jflcars serves the LCARS Jellyfin client and proxies /jf/* to Jellyfin.
+// Command jflcars is LCARS's development server (the client, with /jf/* proxied to a Jellyfin
+// server) and, with -export, writes the client out as the web folder for the Jellyfin image.
 package main
 
 import (
@@ -8,11 +9,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -22,16 +21,9 @@ import (
 
 var version = "dev" // set with -ldflags "-X main.version=..."
 
-// Private, Docker, CGNAT (Tailscale and the like) and loopback ranges.
-const defaultCIDRs = "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,127.0.0.0/8,::1/128,fc00::/7"
-
 func main() {
-	health := flag.Bool("healthcheck", false, "probe the local server and exit (for the container healthcheck)")
 	export := flag.String("export", "", "write LCARS as a web client folder for Jellyfin (JELLYFIN_WEB_DIR) to this path and exit")
 	flag.Parse()
-	if *health {
-		os.Exit(healthcheck())
-	}
 	if *export != "" {
 		if err := web.Export(webui.Static(), version, *export); err != nil {
 			fmt.Fprintln(os.Stderr, "export:", err)
@@ -56,16 +48,7 @@ func run() error {
 	if err != nil || jf.Host == "" {
 		return fmt.Errorf("JELLYFIN_URL: not a URL")
 	}
-	var cidrs []netip.Prefix
-	for _, c := range strings.Split(env("JFL_ALLOWED_CIDRS", defaultCIDRs), ",") {
-		p, err := netip.ParsePrefix(strings.TrimSpace(c))
-		if err != nil {
-			return fmt.Errorf("JFL_ALLOWED_CIDRS: %w", err)
-		}
-		cidrs = append(cidrs, p)
-	}
-
-	srv, err := web.New(web.Options{Jellyfin: jf, AllowedCIDRs: cidrs, Static: webui.Static(), Version: version})
+	srv, err := web.New(web.Options{Jellyfin: jf, Static: webui.Static(), Version: version})
 	if err != nil {
 		return err
 	}
@@ -81,7 +64,7 @@ func run() error {
 	defer stop()
 	errc := make(chan error, 1)
 	go func() { errc <- hs.ListenAndServe() }()
-	slog.Info("jellyfin-lcars listening", "addr", listen, "version", version, "jellyfin", jf.Redacted())
+	slog.Info("LCARS dev server listening", "addr", listen, "version", version, "jellyfin", jf.Redacted())
 
 	select {
 	case err := <-errc:
@@ -100,17 +83,4 @@ func env(k, def string) string {
 		return v
 	}
 	return def
-}
-
-func healthcheck() int {
-	addr := env("JFL_LISTEN", "127.0.0.1:8080")
-	if addr[0] == ':' {
-		addr = "127.0.0.1" + addr
-	}
-	c := &http.Client{Timeout: 3 * time.Second}
-	resp, err := c.Get("http://" + addr + "/healthz")
-	if err != nil || resp.StatusCode != http.StatusOK {
-		return 1
-	}
-	return 0
 }

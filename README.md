@@ -67,7 +67,7 @@ Jellyfin 12 notes:
 JELLYFIN_URL=http://<your-jellyfin>:8096 deploy/dev.sh    # builds (local Go, or the golang image in podman), runs on :8080
 ```
 
-For development a small Go server (`cmd/jflcars`) serves the client and proxies `/jf/*` to a Jellyfin server, so you can work against any Jellyfin without rebuilding an image. The assets are embedded, so rebuild after changing them. `JFL_LISTEN` (default `:8080`) and `JFL_ALLOWED_CIDRS` (default: private, Docker, CGNAT and loopback ranges) set where it listens and who may connect. The plugin builds with `dotnet build plugin/Jellyfin.Plugin.Lcars/Jellyfin.Plugin.Lcars.csproj`. Every push to main runs the tests and publishes the image (`.github/workflows/image.yml`).
+For development a small Go server (`cmd/jflcars`) serves the client and proxies `/jf/*` to a Jellyfin server, so you can work against any Jellyfin without rebuilding an image. The assets are embedded, so rebuild after changing them. `JFL_LISTEN` (default `:8080`) sets where it listens; it's for development, not for exposing to the internet. The plugin builds with `dotnet build plugin/Jellyfin.Plugin.Lcars/Jellyfin.Plugin.Lcars.csproj`. Every push to main runs the tests and publishes the image (`.github/workflows/image.yml`).
 
 ## Licences
 

@@ -2,7 +2,6 @@ package web
 
 import (
 	"bytes"
-	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
 	"io/fs"
@@ -14,7 +13,7 @@ import (
 	"strings"
 )
 
-// assets holds the embedded static files in memory, pre-compressed, with content-hash ETags.
+// assets holds the embedded static files in memory, with content-hash ETags.
 type assets struct {
 	files   map[string]*asset
 	version string
@@ -22,13 +21,10 @@ type assets struct {
 }
 
 type asset struct {
-	data, gz []byte
-	ctype    string
-	etag     string
+	data  []byte
+	ctype string
+	etag  string
 }
-
-// .wasm: the subtitle renderers' WebAssembly (libass is 2.2 MB, 0.9 MB gzipped).
-var compressible = map[string]bool{".html": true, ".css": true, ".js": true, ".mjs": true, ".svg": true, ".json": true, ".webmanifest": true, ".wasm": true}
 
 // The app's entry module; index.html preloads everything it imports statically.
 const entryModule = "js/app.js"
@@ -88,13 +84,6 @@ func newAsset(p string, b []byte) *asset {
 	if f.ctype == "" {
 		f.ctype = "application/octet-stream"
 	}
-	if compressible[ext] && len(b) > 512 {
-		var buf bytes.Buffer
-		zw, _ := gzip.NewWriterLevel(&buf, gzip.BestCompression)
-		zw.Write(b)
-		zw.Close()
-		f.gz = buf.Bytes()
-	}
 	return f
 }
 
@@ -136,12 +125,10 @@ func (a *assets) serveIndex(w http.ResponseWriter, r *http.Request) {
 	a.write(w, r, a.files["/index.html"])
 }
 
-// serve handles /static/<version>/<file>. Every asset URL carries the build version, so a
-// deploy changes every URL and no cache (the browser, or a reverse proxy's asset cache) can serve a
-// stale file. Files for the current version are cached for a year; a request naming another
-// version (an old page during a deploy) gets today's file but must not be cached under it.
+// serve handles /static/<version>/<file>. Development builds change all the time, so nothing is
+// cached without asking (the ETag makes the asking cheap).
 func (a *assets) serve(w http.ResponseWriter, r *http.Request) {
-	ver, file, ok := strings.Cut(strings.TrimPrefix(r.URL.Path, "/static/"), "/")
+	_, file, ok := strings.Cut(strings.TrimPrefix(r.URL.Path, "/static/"), "/")
 	f, found := a.files["/"+file]
 	if !ok || !found || file == "index.html" {
 		http.NotFound(w, r)
@@ -151,11 +138,6 @@ func (a *assets) serve(w http.ResponseWriter, r *http.Request) {
 	// opaque origin, so it can only use Antonio if the font says anyone may. Fonts are public.
 	if strings.HasPrefix(file, "fonts/") {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-	}
-	if ver == a.version && a.version != "dev" && !strings.HasSuffix(a.version, "-dirty") {
-		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	} else {
-		w.Header().Set("Cache-Control", "no-cache")
 	}
 	a.write(w, r, f)
 }
@@ -171,14 +153,8 @@ func (a *assets) write(w http.ResponseWriter, r *http.Request, f *asset) {
 	if h.Get("Cache-Control") == "" {
 		h.Set("Cache-Control", "no-cache") // the page itself: always revalidate (ETag -> 304)
 	}
-	h.Add("Vary", "Accept-Encoding")
 	if r.Header.Get("If-None-Match") == f.etag {
 		w.WriteHeader(http.StatusNotModified)
-		return
-	}
-	if f.gz != nil && strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-		h.Set("Content-Encoding", "gzip")
-		w.Write(f.gz)
 		return
 	}
 	w.Write(f.data)
