@@ -183,3 +183,29 @@
 .eng-imgtype .set-h { margin: 8px 0 0; }
 /* Settings rows fill their deck in Engineering (elsewhere they stop at 1100 px). */
 .eng-page .set-row { max-width: none; }
+
+/* libraries (A3) */
+.eng-subtabs { margin: 0; }
+.eng-libs { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 12px; margin-top: 12px; }
+.eng-lib { display: grid; grid-template-columns: 160px minmax(0, 1fr); grid-template-rows: auto auto; gap: 10px 14px; padding: 10px 12px; background: #0e0d14;
+  border-left: 8px solid var(--lilac); border-radius: 0 20px 20px 0; }
+.eng-lib-img img, .eng-lib-img .noimg { width: 160px; aspect-ratio: 16 / 9; object-fit: cover; display: grid; place-items: center; border-radius: 6px; background: #15131c; color: var(--lilac); }
+.eng-lib-b { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.eng-lib-n { color: var(--orange); font-size: 24px; font-weight: 700; text-decoration: none; }
+.eng-lib-n:hover, .eng-lib-n:focus-visible { text-decoration: underline; outline: none; }
+.eng-lib-p { display: grid; gap: 2px; }
+.eng-lib-p span { color: var(--dim); font-size: 14px; text-transform: none; overflow-wrap: anywhere; }
+.eng-lib-scan span { color: var(--sky); animation: blink 1.2s steps(2, jump-none) infinite; }
+.eng-lib-a { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+.eng-folders { display: grid; gap: 8px; justify-items: start; }
+.eng-folder { display: flex; gap: 10px; align-items: center; padding: 4px 6px 4px 14px; background: #15131c; border-radius: 20px; }
+.eng-folder span { color: var(--peach); text-transform: none; }
+.eng-provs { display: grid; gap: 6px; margin-bottom: 6px; }
+.eng-prov { display: flex; gap: 10px; align-items: center; }
+.eng-prov .toggle { height: var(--ctl-h); width: var(--ctl-short); min-width: var(--ctl-short); font-size: 16px; }
+.eng-prov-n { flex: 1; color: var(--dim); }
+.eng-prov.on .eng-prov-n { color: var(--peach); }
+.eng-imgopts { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-bottom: 10px; }
+.eng-imgopt { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.eng-imgopt > span { color: var(--peach); }
+.eng-imgopt .inp.num { width: 90px; height: var(--ctl-h); text-align: center; }

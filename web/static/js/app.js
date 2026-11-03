@@ -748,10 +748,19 @@ app.subscribe = (type, fn, interval = '0,1500') => {
   };
 };
 function resubscribe() { for (const [type, s] of subs) app.socket?.send(`${type}Start`, s.interval); }
+// Messages the server pushes without being asked (RefreshProgress to admins, for one).
+const listeners = new Map(); // type -> Set of fns
+app.listen = (type, fn) => {
+  if (!listeners.has(type)) listeners.set(type, new Set());
+  listeners.get(type).add(fn);
+  return () => listeners.get(type)?.delete(fn);
+};
 
 async function onSocket(m) {
   const sub = subs.get(m.MessageType);
   if (sub) { for (const fn of [...sub.fns]) fn(m.Data); return; }
+  const ls = listeners.get(m.MessageType);
+  if (ls?.size) { for (const fn of [...ls]) fn(m.Data); return; }
   const d = m.Data || {};
   const p = app.player;
   const q = app.queue;

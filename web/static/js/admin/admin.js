@@ -10,6 +10,7 @@ import { confirmDialog } from '../menu.js';
 export const SECTIONS = [
   { id: 'overview', label: 'Overview', n: 'E-01', color: 'orange', load: () => import('./overview.js').then(m => m.overview) },
   { id: 'users', label: 'Users', n: 'E-02', color: 'sky', load: () => import('./users.js').then(m => m.users) },
+  { id: 'libraries', label: 'Libraries', n: 'E-03', color: 'lilac', load: () => import('./libraries.js').then(m => m.libraries) },
   // Item tools (A8), opened from an item's ⋯ menu rather than the rail. Subtitle managers who
   // aren't admins may use the subtitle tool.
   { id: 'edit', hidden: true, load: () => import('./edit.js').then(m => m.edit),

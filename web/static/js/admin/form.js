@@ -2,7 +2,7 @@
 // bar that appears once something changed (Save, Revert). Server settings affect everyone, so
 // nothing is saved until Save, unlike the user's own settings. Leaving with unsaved changes asks.
 import { h, fill } from '../h.js';
-import { btn, toast } from '../ui.js';
+import { btn, arrow, toast } from '../ui.js';
 import { dialog, confirmDialog } from '../menu.js';
 
 const copy = v => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
@@ -150,6 +150,54 @@ export function editForm({ load, save, restartKeys = [], app }) {
     const sync = () => { i.value = f.get(key) ?? ''; };
     i.addEventListener('input', () => f.set(key, i.value));
     return control(i, sync);
+  };
+
+  /**
+   * Providers in order, each on or off (library fetchers, readers, savers). names: every
+   * provider, in the server's order. orderKey: the stored order (missing names go last).
+   * Exactly one of enabledKey (a list of the ones on) or disabledKey (the ones off).
+   * defaults: names on when the stored list is missing.
+   */
+  f.providers = ({ names, orderKey, enabledKey, disabledKey, defaults = names }) => {
+    const el = h('div.eng-provs');
+    const order = () => {
+      const o = (orderKey && f.get(orderKey)) || [];
+      return [...o.filter(n => names.includes(n)), ...names.filter(n => !o.includes(n))];
+    };
+    const isOn = n => {
+      if (enabledKey) { const v = f.get(enabledKey); return v ? v.includes(n) : defaults.includes(n); }
+      const v = f.get(disabledKey); return v ? !v.includes(n) : defaults.includes(n);
+    };
+    const setOn = (n, on) => {
+      const list = order();
+      if (enabledKey) f.set(enabledKey, list.filter(x => (x === n ? on : isOn(x))));
+      else f.set(disabledKey, list.filter(x => !(x === n ? on : isOn(x))));
+    };
+    const sync = () => {
+      const list = order();
+      fill(el, list.length ? list.map((n, i) => h('div.eng-prov', { class: isOn(n) ? 'on' : '' },
+        h('button.toggle', { type: 'button', class: isOn(n) ? 'on' : '', onclick: () => { setOn(n, !isOn(n)); sync(); } }, isOn(n) ? 'On' : 'Off'),
+        h('span.eng-prov-n', n),
+        orderKey ? [
+          btn(arrow('u'), () => { const l = order(); [l[i - 1], l[i]] = [l[i], l[i - 1]]; f.set(orderKey, l); sync(); }, { small: true, ico: true, color: 'lilac', ghost: true, disabled: i === 0, title: 'Earlier' }),
+          btn(arrow('d'), () => { const l = order(); [l[i + 1], l[i]] = [l[i], l[i + 1]]; f.set(orderKey, l); sync(); }, { small: true, ico: true, color: 'lilac', ghost: true, disabled: i === list.length - 1, title: 'Later' }),
+        ] : null)) : h('p.dlg-note', 'None installed.'));
+    };
+    return control(el, sync);
+  };
+
+  /** Chips chosen from a long list (languages): a select adds one, ✕ removes it. */
+  f.pickList = (key, options, { placeholder = 'Add…' } = {}) => {
+    const chips = h('div.eng-tags');
+    const sel = h('select.sel');
+    const sync = () => {
+      const on = f.get(key) || [];
+      fill(chips, on.map(v => h('span.eng-tag', options.find(([, x]) => x === v)?.[0] || v,
+        h('button', { type: 'button', title: 'Remove', onclick: () => { f.set(key, (f.get(key) || []).filter(x => x !== v)); sync(); } }, '✕'))));
+      fill(sel, h('option', { value: '' }, placeholder), options.filter(([, v]) => !on.includes(v)).map(([l, v]) => h('option', { value: v }, l)));
+    };
+    sel.addEventListener('change', () => { if (sel.value) { f.set(key, [...(f.get(key) || []), sel.value]); sync(); } });
+    return control(h('div.eng-tagbox', chips, sel), sync);
   };
 
   /** A date (Jellyfin keeps ISO dates; this shows and edits the day). Empty stores null. */
