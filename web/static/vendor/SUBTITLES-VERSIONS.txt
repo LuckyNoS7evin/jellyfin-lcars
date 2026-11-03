@@ -1,0 +1,2 @@
+libass: @jellyfin/libass-wasm 4.2.4 (dist/js, without the legacy asm.js worker)
+libbitsub: libbitsub 1.11.0 (dist + pkg; relative imports given .js extensions so they load without a bundler)

@@ -1,0 +1,506 @@
+/**
+ * Web Worker management for libbitsub.
+ * Handles off-main-thread subtitle parsing and rendering.
+ */
+import { getWasmGlueUrl, getWasmUrl } from './wasm.js';
+let sharedWorker = null;
+let workerInitPromise = null;
+let messageId = 0;
+const pendingCallbacks = new Map();
+/** Check if Web Workers are available. */
+export function isWorkerAvailable() {
+    return typeof Worker !== 'undefined' && typeof window !== 'undefined' && typeof Blob !== 'undefined';
+}
+/** Create inline worker script with embedded WASM loader. */
+function createWorkerScript() {
+    return `
+let wasmModule = null;
+const pgsParsers = new Map();
+const vobSubParsers = new Map();
+
+function buildPgsMetadata(parser) {
+    return {
+        format: 'pgs',
+        cueCount: parser.count,
+        screenWidth: parser.screenWidth || 0,
+        screenHeight: parser.screenHeight || 0
+    };
+}
+
+function buildVobSubMetadata(parser) {
+    return {
+        format: 'vobsub',
+        cueCount: parser.count,
+        screenWidth: parser.screenWidth || 0,
+        screenHeight: parser.screenHeight || 0,
+        language: parser.language || '',
+        trackId: parser.trackId || '',
+        hasIdxMetadata: !!parser.hasIdxMetadata
+    };
+}
+
+function disposeSession(sessionId) {
+    const pgsParser = pgsParsers.get(sessionId);
+    if (pgsParser) {
+        pgsParser.free();
+        pgsParsers.delete(sessionId);
+    }
+    const vobSubParser = vobSubParsers.get(sessionId);
+    if (vobSubParser) {
+        vobSubParser.free();
+        vobSubParsers.delete(sessionId);
+    }
+}
+
+async function initWasm(wasmUrl, glueUrl) {
+    if (wasmModule) return;
+
+    let jsGlueUrl = glueUrl;
+    if (!jsGlueUrl) {
+        const derivedUrl = new URL(wasmUrl);
+        derivedUrl.pathname = derivedUrl.pathname.replace(/_bg\.wasm$/, '.js');
+        jsGlueUrl = derivedUrl.href;
+    }
+    const mod = await import(jsGlueUrl);
+    await mod.default({ module_or_path: wasmUrl });
+    wasmModule = mod;
+}
+
+function convertFrame(frame, isVobSub) {
+    const compositions = [];
+    if (isVobSub) {
+        const rgba = frame.getRgba();
+        if (frame.width > 0 && frame.height > 0 && rgba.length === frame.width * frame.height * 4) {
+            compositions.push({ rgba, x: frame.x, y: frame.y, width: frame.width, height: frame.height });
+        }
+        return { width: frame.screenWidth, height: frame.screenHeight, compositions };
+    }
+
+    for (let i = 0; i < frame.compositionCount; i++) {
+        const comp = frame.getComposition(i);
+        if (!comp) continue;
+        const rgba = comp.getRgba();
+        if (comp.width > 0 && comp.height > 0 && rgba.length === comp.width * comp.height * 4) {
+            compositions.push({ rgba, x: comp.x, y: comp.y, width: comp.width, height: comp.height });
+        }
+    }
+
+    return { width: frame.width, height: frame.height, compositions };
+}
+
+function postResponse(response, transfer, id) {
+    if (id !== undefined) response._id = id;
+    self.postMessage(response, transfer && transfer.length > 0 ? transfer : undefined);
+}
+
+self.onmessage = async function(event) {
+    const { _id, ...request } = event.data;
+
+    try {
+        switch (request.type) {
+            case 'init': {
+                await initWasm(request.wasmUrl, request.glueUrl);
+                postResponse({ type: 'initComplete', success: true }, [], _id);
+                break;
+            }
+            case 'loadPgs': {
+                disposeSession(request.sessionId);
+                const parser = new wasmModule.PgsParser();
+                const count = parser.parse(new Uint8Array(request.data));
+                const timestamps = parser.getTimestamps();
+                pgsParsers.set(request.sessionId, parser);
+                postResponse(
+                    { type: 'pgsLoaded', count, byteLength: request.data.byteLength, metadata: buildPgsMetadata(parser), timestamps },
+                    [timestamps.buffer],
+                    _id
+                );
+                break;
+            }
+            case 'beginPgs': {
+                disposeSession(request.sessionId);
+                const parser = new wasmModule.PgsParser();
+                parser.reset();
+                pgsParsers.set(request.sessionId, parser);
+                const timestamps = parser.getTimestamps();
+                postResponse(
+                    { type: 'pgsProgress', count: 0, added: 0, partial: true, metadata: buildPgsMetadata(parser), timestamps },
+                    [timestamps.buffer],
+                    _id
+                );
+                break;
+            }
+            case 'appendPgs': {
+                let parser = pgsParsers.get(request.sessionId);
+                if (!parser) {
+                    parser = new wasmModule.PgsParser();
+                    parser.reset();
+                    pgsParsers.set(request.sessionId, parser);
+                }
+                const added = parser.feed(new Uint8Array(request.data));
+                const timestamps = parser.getTimestamps();
+                postResponse(
+                    { type: 'pgsProgress', count: parser.count, added, partial: true, metadata: buildPgsMetadata(parser), timestamps },
+                    [timestamps.buffer],
+                    _id
+                );
+                break;
+            }
+            case 'finishPgs': {
+                const parser = pgsParsers.get(request.sessionId);
+                if (!parser) {
+                    postResponse({ type: 'error', message: 'PGS session not found for finishPgs' }, [], _id);
+                    break;
+                }
+                const count = parser.finishFeed();
+                const timestamps = parser.getTimestamps();
+                postResponse(
+                    { type: 'pgsProgress', count, added: 0, partial: false, metadata: buildPgsMetadata(parser), timestamps },
+                    [timestamps.buffer],
+                    _id
+                );
+                break;
+            }
+            case 'loadVobSub': {
+                disposeSession(request.sessionId);
+                const parser = new wasmModule.VobSubParser();
+                parser.loadFromData(request.idxContent, new Uint8Array(request.subData));
+                const timestamps = parser.getTimestamps();
+                vobSubParsers.set(request.sessionId, parser);
+                postResponse(
+                    { type: 'vobSubLoaded', count: parser.count, metadata: buildVobSubMetadata(parser), timestamps },
+                    [timestamps.buffer],
+                    _id
+                );
+                break;
+            }
+            case 'loadVobSubIdx': {
+                disposeSession(request.sessionId);
+                const parser = new wasmModule.VobSubParser();
+                parser.loadFromIdx(request.idxContent);
+                const timestamps = parser.getTimestamps();
+                vobSubParsers.set(request.sessionId, parser);
+                postResponse(
+                    {
+                        type: 'vobSubProgress',
+                        count: parser.count,
+                        partial: true,
+                        hasSubData: !!parser.hasSubData,
+                        metadata: buildVobSubMetadata(parser),
+                        timestamps
+                    },
+                    [timestamps.buffer],
+                    _id
+                );
+                break;
+            }
+            case 'attachVobSubData': {
+                const parser = vobSubParsers.get(request.sessionId);
+                if (!parser) {
+                    postResponse({ type: 'error', message: 'VobSub session not found for attachVobSubData' }, [], _id);
+                    break;
+                }
+                parser.attachSubData(new Uint8Array(request.subData));
+                const timestamps = parser.getTimestamps();
+                postResponse(
+                    {
+                        type: 'vobSubProgress',
+                        count: parser.count,
+                        partial: false,
+                        hasSubData: !!parser.hasSubData,
+                        metadata: buildVobSubMetadata(parser),
+                        timestamps
+                    },
+                    [timestamps.buffer],
+                    _id
+                );
+                break;
+            }
+            case 'loadVobSubMks': {
+                disposeSession(request.sessionId);
+                const parser = new wasmModule.VobSubParser();
+                parser.loadFromMks(new Uint8Array(request.subData));
+                const timestamps = parser.getTimestamps();
+                vobSubParsers.set(request.sessionId, parser);
+                postResponse(
+                    { type: 'vobSubLoaded', count: parser.count, metadata: buildVobSubMetadata(parser), timestamps },
+                    [timestamps.buffer],
+                    _id
+                );
+                break;
+            }
+            case 'loadVobSubOnly': {
+                disposeSession(request.sessionId);
+                const parser = new wasmModule.VobSubParser();
+                parser.loadFromSubOnly(new Uint8Array(request.subData));
+                const timestamps = parser.getTimestamps();
+                vobSubParsers.set(request.sessionId, parser);
+                postResponse(
+                    { type: 'vobSubLoaded', count: parser.count, metadata: buildVobSubMetadata(parser), timestamps },
+                    [timestamps.buffer],
+                    _id
+                );
+                break;
+            }
+            case 'renderPgsAtIndex': {
+                const parser = pgsParsers.get(request.sessionId);
+                if (!parser) { postResponse({ type: 'pgsFrame', frame: null }, [], _id); break; }
+                const frame = parser.renderAtIndex(request.index);
+                const renderIssue = parser.lastRenderIssue || '';
+                if (!frame) { postResponse({ type: 'pgsFrame', frame: null, renderIssue }, [], _id); break; }
+                const frameData = convertFrame(frame, false);
+                postResponse({ type: 'pgsFrame', frame: frameData, renderIssue }, frameData.compositions.map((c) => c.rgba.buffer), _id);
+                break;
+            }
+            case 'renderVobSubAtIndex': {
+                const parser = vobSubParsers.get(request.sessionId);
+                if (!parser) { postResponse({ type: 'vobSubFrame', frame: null }, [], _id); break; }
+                const frame = parser.renderAtIndex(request.index);
+                const renderIssue = parser.lastRenderIssue || '';
+                if (!frame) { postResponse({ type: 'vobSubFrame', frame: null, renderIssue }, [], _id); break; }
+                const frameData = convertFrame(frame, true);
+                postResponse({ type: 'vobSubFrame', frame: frameData, renderIssue }, frameData.compositions.map((c) => c.rgba.buffer), _id);
+                break;
+            }
+            case 'findPgsIndex': {
+                const parser = pgsParsers.get(request.sessionId);
+                postResponse({ type: 'pgsIndex', index: parser ? parser.findIndexAtTimestamp(request.timeMs) : -1 }, [], _id);
+                break;
+            }
+            case 'findVobSubIndex': {
+                const parser = vobSubParsers.get(request.sessionId);
+                postResponse({ type: 'vobSubIndex', index: parser ? parser.findIndexAtTimestamp(request.timeMs) : -1 }, [], _id);
+                break;
+            }
+            case 'getPgsTimestamps': {
+                const parser = pgsParsers.get(request.sessionId);
+                postResponse({ type: 'pgsTimestamps', timestamps: parser ? parser.getTimestamps() : new Float64Array(0) }, [], _id);
+                break;
+            }
+            case 'getVobSubTimestamps': {
+                const parser = vobSubParsers.get(request.sessionId);
+                postResponse({ type: 'vobSubTimestamps', timestamps: parser ? parser.getTimestamps() : new Float64Array(0) }, [], _id);
+                break;
+            }
+            case 'clearPgsCache': {
+                pgsParsers.get(request.sessionId)?.clearCache();
+                postResponse({ type: 'cleared' }, [], _id);
+                break;
+            }
+            case 'clearVobSubCache': {
+                vobSubParsers.get(request.sessionId)?.clearCache();
+                postResponse({ type: 'cleared' }, [], _id);
+                break;
+            }
+            case 'disposePgs': {
+                const parser = pgsParsers.get(request.sessionId);
+                if (parser) {
+                    parser.free();
+                    pgsParsers.delete(request.sessionId);
+                }
+                postResponse({ type: 'disposed' }, [], _id);
+                break;
+            }
+            case 'disposeVobSub': {
+                const parser = vobSubParsers.get(request.sessionId);
+                if (parser) {
+                    parser.free();
+                    vobSubParsers.delete(request.sessionId);
+                }
+                postResponse({ type: 'disposed' }, [], _id);
+                break;
+            }
+            case 'setVobSubDebandEnabled': {
+                vobSubParsers.get(request.sessionId)?.setDebandEnabled(request.enabled);
+                postResponse({ type: 'debandSet' }, [], _id);
+                break;
+            }
+            case 'setVobSubDebandThreshold': {
+                vobSubParsers.get(request.sessionId)?.setDebandThreshold(request.threshold);
+                postResponse({ type: 'debandSet' }, [], _id);
+                break;
+            }
+            case 'setVobSubDebandRange': {
+                vobSubParsers.get(request.sessionId)?.setDebandRange(request.range);
+                postResponse({ type: 'debandSet' }, [], _id);
+                break;
+            }
+        }
+    } catch (error) {
+        postResponse({ type: 'error', message: error instanceof Error ? error.message : String(error) }, [], _id);
+    }
+};`;
+}
+/** Whether the shared worker has finished WASM initialization. */
+export function isWorkerReady() {
+    return sharedWorker !== null;
+}
+/** Create or get the shared worker instance. */
+export function getOrCreateWorker() {
+    if (sharedWorker)
+        return Promise.resolve(sharedWorker);
+    if (workerInitPromise)
+        return workerInitPromise;
+    const initPromise = initializeWorker();
+    workerInitPromise = initPromise;
+    void initPromise.then(() => {
+        if (workerInitPromise === initPromise)
+            workerInitPromise = null;
+    }, () => {
+        if (workerInitPromise === initPromise)
+            workerInitPromise = null;
+    });
+    return initPromise;
+}
+/** Pre-initialize the shared subtitle worker. */
+export function warmup() {
+    return ready();
+}
+/** Wait until the shared worker is ready for parse/render requests. */
+export async function ready() {
+    if (!isWorkerAvailable())
+        return;
+    if (sharedWorker)
+        return;
+    await getOrCreateWorker();
+}
+async function initializeWorker() {
+    const blob = new Blob([createWorkerScript()], { type: 'application/javascript' });
+    const workerUrl = URL.createObjectURL(blob);
+    let worker;
+    try {
+        worker = new Worker(workerUrl, { type: 'module' });
+    }
+    catch (error) {
+        URL.revokeObjectURL(workerUrl);
+        throw error instanceof Error ? error : new Error(String(error));
+    }
+    worker.onmessage = (event) => {
+        const { _id, ...response } = event.data;
+        if (_id === undefined)
+            return;
+        const callback = pendingCallbacks.get(_id);
+        if (!callback)
+            return;
+        pendingCallbacks.delete(_id);
+        if (response.type === 'error' && callback.requestType === 'init') {
+            callback.reject(new Error(response.message));
+        }
+        else {
+            callback.resolve(response);
+        }
+    };
+    worker.onerror = (event) => {
+        const error = event instanceof ErrorEvent ? new Error(event.message) : new Error(String(event));
+        rejectWorkerCallbacks(worker, error);
+        if (sharedWorker === worker)
+            sharedWorker = null;
+        try {
+            worker.terminate();
+        }
+        catch {
+            /* ignore */
+        }
+    };
+    try {
+        const initResponse = await sendToWorkerInstance(worker, {
+            type: 'init',
+            wasmUrl: getWasmUrl(),
+            glueUrl: getWasmGlueUrl()
+        });
+        if (initResponse.type === 'error') {
+            throw new Error(initResponse.message);
+        }
+        if (initResponse.type !== 'initComplete' || !initResponse.success) {
+            throw new Error('Worker WASM initialization failed');
+        }
+        sharedWorker = worker;
+        return worker;
+    }
+    catch (error) {
+        const workerError = error instanceof Error ? error : new Error(String(error));
+        rejectWorkerCallbacks(worker, workerError);
+        if (sharedWorker === worker)
+            sharedWorker = null;
+        try {
+            worker.terminate();
+        }
+        catch {
+            /* ignore */
+        }
+        throw workerError;
+    }
+    finally {
+        URL.revokeObjectURL(workerUrl);
+    }
+}
+/** Default timeout for worker operations (30 seconds for large files) */
+const WORKER_TIMEOUT = 30000;
+/** Send a message to the worker with timeout support. */
+export function sendToWorker(request, timeout = WORKER_TIMEOUT) {
+    if (!sharedWorker) {
+        return Promise.reject(new Error('Worker not initialized'));
+    }
+    return sendToWorkerInstance(sharedWorker, request, timeout);
+}
+function sendToWorkerInstance(worker, request, timeout = WORKER_TIMEOUT) {
+    return new Promise((resolve, reject) => {
+        const id = ++messageId;
+        const timeoutId = setTimeout(() => {
+            pendingCallbacks.delete(id);
+            reject(new Error(`Worker operation timed out after ${timeout}ms`));
+        }, timeout);
+        pendingCallbacks.set(id, {
+            worker,
+            requestType: request.type,
+            resolve: (response) => {
+                clearTimeout(timeoutId);
+                resolve(response);
+            },
+            reject: (error) => {
+                clearTimeout(timeoutId);
+                reject(error);
+            }
+        });
+        const transfers = [];
+        if ('data' in request && request.data instanceof ArrayBuffer)
+            transfers.push(request.data);
+        if ('subData' in request && request.subData instanceof ArrayBuffer)
+            transfers.push(request.subData);
+        try {
+            worker.postMessage({ ...request, _id: id }, transfers);
+        }
+        catch (error) {
+            pendingCallbacks.delete(id);
+            clearTimeout(timeoutId);
+            reject(error instanceof Error ? error : new Error(String(error)));
+        }
+    });
+}
+function rejectWorkerCallbacks(worker, error) {
+    for (const [id, callback] of pendingCallbacks) {
+        if (callback.worker !== worker)
+            continue;
+        pendingCallbacks.delete(id);
+        callback.reject(error);
+    }
+}
+/**
+ * Test-only helper: tear down shared worker state between Bun test files.
+ * Not part of the public runtime API.
+ */
+export function resetWorkerForTests() {
+    if (sharedWorker) {
+        try {
+            sharedWorker.terminate();
+        }
+        catch {
+            /* ignore */
+        }
+    }
+    sharedWorker = null;
+    workerInitPromise = null;
+    for (const [, callback] of pendingCallbacks) {
+        callback.reject(new Error('Worker reset for tests'));
+    }
+    pendingCallbacks.clear();
+}

@@ -1,0 +1,5 @@
+/bin/
+/desktop/src-tauri/target/
+/desktop/src-tauri/gen/
+/desktop/dist/
+/desktop/node_modules/

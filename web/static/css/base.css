@@ -1,0 +1,8 @@
+/* Shared by both themes: reset and the pre-theme loading state. */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { margin: 0; min-height: 100vh; background: #000; color: #e8ecf1; }
+img { display: block; max-width: 100%; }
+button { font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; }
+#app:empty::after { content: ""; position: fixed; inset: 0; background: #0b0e14; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

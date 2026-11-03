@@ -1,0 +1,23 @@
+# An example Docker Compose service. Copy it, set JELLYFIN_URL to your server, and run
+#   docker compose -f compose.example.yml up -d
+# then open http://<this host>:8080. There are no secrets: every browser signs in to Jellyfin
+# with its own account.
+services:
+  jellyfin-lcars:
+    image: ghcr.io/luckynos7evin/jellyfin-lcars:latest
+    container_name: jellyfin-lcars
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 64m
+    pids_limit: 64
+    environment:
+      GOMEMLIMIT: 48MiB
+      # Your Jellyfin server, as this container reaches it.
+      JELLYFIN_URL: http://jellyfin:8096
+      # Who may connect, as CIDRs (the direct peer: a browser, or your reverse proxy).
+      # Default: private, Docker, CGNAT and loopback ranges.
+      # JFL_ALLOWED_CIDRS: 192.168.0.0/16,127.0.0.0/8
