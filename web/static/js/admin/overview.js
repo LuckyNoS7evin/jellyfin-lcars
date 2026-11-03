@@ -101,7 +101,8 @@ export async function overview(ctx) {
     return h('div.eng-sess', { key: s.Id },
       np ? h('div.eng-sess-img', image(api, pickImage(np, np.MediaType === 'Audio' ? 'square' : 'poster'), { shape: np.MediaType === 'Audio' ? 'square' : 'poster' })) : h('div.eng-sess-img.none'),
       h('div.eng-sess-b',
-        h('div.eng-sess-who', h('b', s.UserName || 'No user'), h('span', `${s.DeviceName} · ${s.Client} ${s.ApplicationVersion || ''}`.trim())),
+        h('div.eng-sess-who', h('b', s.UserName || 'No user'), h('span', `${s.DeviceName} · ${s.Client} ${s.ApplicationVersion || ''}`.trim()),
+          s.DeviceId === api.deviceId ? tag('This device', 'sky') : null),
         np ? [
           h('a.eng-sess-t', { href: `#/item/${np.Id}` }, [np.SeriesName, np.Type === 'Episode' ? epCode(np) : '', np.Name].filter(Boolean).join(' · ')),
           dur ? h('div.eng-sess-p', seg(pos / dur, { n: 30, tone: ps.IsPaused ? 'lilac' : 'orange' }), h('span', `${ps.IsPaused ? 'Paused ' : ''}${f.clock(pos)} / ${f.clock(dur)}`)) : null,
@@ -138,10 +139,12 @@ export async function overview(ctx) {
     if (!(await confirmDialog('Stop playback', `Stop what ${who} is playing?`, 'Stop'))) return;
     try { await api.post(`/Sessions/${s.Id}/Playing/Stop`); toast('Stopped', who, 'red', 2500); } catch (e) { toast('Unable to comply', e.message, 'red'); }
   }
-  const ACTIVE_MS = 10 * 60 * 1000;
+  // As official (useLiveSessions, filterSessions): everyone active in the last 16 minutes, this
+  // device included (inside Jellyfin's desktop or phone app, that's the app).
+  const ACTIVE_MS = 960 * 1000;
   function drawSessions(list) {
     const now = Date.now();
-    const shown = list.filter(s => s.DeviceId !== api.deviceId && (s.NowPlayingItem || now - Date.parse(s.LastActivityDate) < ACTIVE_MS))
+    const shown = list.filter(s => (s.NowPlayingItem || s.UserId) && (s.NowPlayingItem || now - Date.parse(s.LastActivityDate) < ACTIVE_MS))
       .sort((a, b) => (!!b.NowPlayingItem - !!a.NowPlayingItem) || Date.parse(b.LastActivityDate) - Date.parse(a.LastActivityDate));
     const playing = shown.filter(s => s.NowPlayingItem).length;
     sessDeck.querySelector('.code').textContent = `${playing} active`;

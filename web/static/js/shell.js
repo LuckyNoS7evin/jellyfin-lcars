@@ -52,7 +52,10 @@ export async function nativeVideoPlayer(hooks) {
         const Cls = await make();
         if (typeof Cls !== 'function') continue;
         const p = new Cls({ events, playbackManager, loading: { show() {}, hide() {} }, appSettings: {}, globalize: { translate: k => k } });
-        if (p.type === 'mediaplayer' && p.canPlayMediaType?.('Video')) { videoPlugin = p; break; }
+        // Only the iPhone app's player for now: engine-native.js follows its interface. The desktop
+        // app (Jellyfin Media Player) offers an mpv player that works differently; it keeps
+        // LCARS's own player until that's built and tested.
+        if (p.type === 'mediaplayer' && p.name === 'ExpoVideoPlayer' && p.canPlayMediaType?.('Video')) { videoPlugin = p; break; }
       } catch (e) { console.warn('NativeShell plugin', name, e); }
     }
   }
