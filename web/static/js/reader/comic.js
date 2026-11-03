@@ -1,5 +1,6 @@
-// Comic reader (cbz): one or two pages at a time, left-to-right or right-to-left (manga).
-// Pages are read straight out of the archive as they're needed, a few ahead.
+// Page-by-page reader for comics and manga: one or two pages at a time, left-to-right or
+// right-to-left. Pages come from a source as they're needed, a few ahead: the images in a cbz
+// (read straight out of the archive), or a PDF's pages drawn by pdf.js (pdf.js).
 import { h } from '../h.js';
 import { btn } from '../ui.js';
 import { IMAGE_RE } from './zip.js';
@@ -8,14 +9,13 @@ const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'bas
 // Progress is the page index, as the official comics player reports it (ms × 10 000 ticks).
 const PAGE_TICKS = 10000;
 
-export async function comicEngine({ app, zip, stage, item, startTicks, onChange }) {
+/** A cbz: its images in name order, and ComicInfo.xml's word on whether it's manga. */
+export async function comicEngine(ctx) {
+  const { zip } = ctx;
   const pages = zip.entries
     .filter(e => IMAGE_RE.test(e.name) && !/(^|\/)(__MACOSX|\.)/.test(e.name))
     .sort((a, b) => collator.compare(a.name, b.name));
   if (!pages.length) throw new Error('No pages in this archive');
-  const n = pages.length;
-
-  // ComicInfo.xml says whether it's right-to-left manga.
   let manga = null;
   const info = zip.entries.find(e => /(^|\/)comicinfo\.xml$/i.test(e.name));
   if (info) {
@@ -24,6 +24,20 @@ export async function comicEngine({ app, zip, stage, item, startTicks, onChange 
       manga = x.getElementsByTagName('Manga')[0]?.textContent?.trim() || null;
     } catch { /* no hint */ }
   }
+  return pagedEngine(ctx, {
+    n: pages.length,
+    format: 'CBZ',
+    manga,
+    blob: i => zip.blob(pages[i]),
+  });
+}
+
+/**
+ * source: {n, format, manga (ComicInfo's Manga value, or null), blob(i) → Promise<Blob> of page
+ * i's image, destroy()?}.
+ */
+export async function pagedEngine({ app, stage, item, startTicks, onChange }, source) {
+  const { n, manga } = source;
 
   // Settings: this series first, then what the book says, then whatever was used last.
   const seriesKey = `reader.comic.${item.ParentId || item.SeriesName || 'all'}`;
@@ -43,7 +57,7 @@ export async function comicEngine({ app, zip, stage, item, startTicks, onChange 
     if (i < 0 || i >= n) return Promise.resolve(null);
     let p = cache.get(i);
     if (!p) {
-      p = zip.blob(pages[i]).then(async b => {
+      p = source.blob(i).then(async b => {
         const url = URL.createObjectURL(b);
         const img = new Image();
         img.src = url;
@@ -110,7 +124,7 @@ export async function comicEngine({ app, zip, stage, item, startTicks, onChange 
 
   return {
     kind: 'Comic',
-    info: () => ['CBZ', `${n} pages`, manga === 'YesAndRightToLeft' ? 'Manga' : null].filter(Boolean),
+    info: () => [source.format, `${n} pages`, manga === 'YesAndRightToLeft' ? 'Manga' : null].filter(Boolean),
     get rtl() { return s.rtl; },
     readout: () => [shown.length === 2 ? `Pages ${at + 1}–${at + 2} of ${n}` : `Page ${at + 1} of ${n}`, `${Math.round(((at + shown.length) / n) * 100)}%`],
     fraction: () => (n > 1 ? (at + shown.length - 1) / (n - 1) : 1),
@@ -136,6 +150,7 @@ export async function comicEngine({ app, zip, stage, item, startTicks, onChange 
       seq++;
       for (const p of cache.values()) p.then(r => r && URL.revokeObjectURL(r.url)).catch(() => {});
       cache.clear();
+      source.destroy?.();
     },
   };
 }

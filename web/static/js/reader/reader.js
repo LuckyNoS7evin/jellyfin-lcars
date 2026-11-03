@@ -1,4 +1,4 @@
-// The book reader overlay: comics (cbz) and EPUBs, in the player's LCARS frame. Turn pages
+// The book reader overlay: comics (cbz), PDFs and EPUBs, in the player's LCARS frame. Turn pages
 // with the arrow keys, a click or tap on either side, a swipe, or the wheel; the middle of the
 // page shows and hides the controls. Progress goes to Jellyfin on every page turn.
 import { h, fill } from '../h.js';
@@ -9,7 +9,14 @@ import { RemoteZip } from './zip.js';
 import { comicEngine } from './comic.js';
 import { epubEngine } from './epub.js';
 
-const FORMATS = { cbz: comicEngine, zip: comicEngine, epub: epubEngine };
+// zip: the book is a zip read with Range requests (whole: fetched in one go below that size).
+// PDFs bring pdf.js, which does its own ranges, only when one is opened.
+const FORMATS = {
+  cbz: { zip: true, make: comicEngine },
+  zip: { zip: true, make: comicEngine },
+  epub: { zip: true, whole: 64 << 20, make: epubEngine },
+  pdf: { make: ctx => import('./pdf.js').then(m => m.pdfEngine(ctx)) },
+};
 
 export function openReader(app, item, opts = {}) {
   const { api } = app;
@@ -89,15 +96,15 @@ export function openReader(app, item, opts = {}) {
       cur = await api.item(item.Id);
       drawTitle();
       const ext = (cur.Path || '').split('.').pop().toLowerCase();
-      const make = FORMATS[ext];
-      if (!make) throw new Error(`${ext ? ext.toUpperCase() : 'This'} books can't be opened here yet`);
-      const zip = await new RemoteZip(api.url(`/Items/${cur.Id}/File`, {}, { auth: true }),
-        { signal: ac.signal, wholeBelow: ext === 'epub' ? 64 << 20 : 0 }).open();
+      const fmt = FORMATS[ext];
+      if (!fmt) throw new Error(`${ext ? ext.toUpperCase() : 'This'} books can't be opened here yet`);
+      const url = api.url(`/Items/${cur.Id}/File`, {}, { auth: true });
+      const zip = fmt.zip ? await new RemoteZip(url, { signal: ac.signal, wholeBelow: fmt.whole || 0 }).open() : null;
       if (closed) return;
       const ud = cur.UserData || {};
       const startTicks = opts.startTicks ?? (opts.fromStart || ud.Played ? 0 : ud.PlaybackPositionTicks || 0);
       setStatus('');
-      engine = await make({ app, zip, stage, item: cur, startTicks, onChange: changed, menu });
+      engine = await fmt.make({ app, zip, url, signal: ac.signal, stage, item: cur, startTicks, onChange: changed, menu });
       if (closed) { engine.destroy(); return; }
       reporter = new Reporter(api, { itemId: cur.Id, mediaSourceId: cur.Id, playSessionId: randomId(), playMethod: 'DirectPlay' },
         () => ({ position: engine.ticks() / TICKS, paused: false }));

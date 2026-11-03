@@ -6,6 +6,7 @@ Jellyfin with an LCARS (Star Trek) web client. The image is the official Jellyfi
 - **Libraries**: poster grids with sort and filter, loading more as you scroll. Music has Albums, Artists and Songs tabs.
 - **Details**: films, series, seasons, episodes, albums, artists, collections, playlists and people. You can resume, pick audio and subtitle tracks, and mark items watched or favourite.
 - **Video player**: direct play when the browser can decode the file, otherwise the server's HLS stream through hls.js. Text subtitles switch instantly. Picture and styled subtitles are burned in by the server. Playback is reported to Jellyfin, so resume points and watched marks stay in sync with the official clients.
+- **Books**: a reader for comics and manga (CBZ and PDF: one or two pages, right-to-left for manga) and EPUBs (reflowing text, your font and size), with progress kept in Jellyfin.
 - **Music**: one queue for the whole app with a mini player in the footer, so it keeps playing while you browse.
 - **Remote control**: the server's dashboard and other clients can control it (play, seek, tracks, volume, full screen, go to a page, messages).
 - **Play on**: control your other Jellyfin apps (a TV, a phone, another browser) from LCARS; while one is chosen, whatever you play goes there.
@@ -74,4 +75,5 @@ For development a small Go server (`cmd/jflcars`) serves the client and proxies 
 - jellyfin-lcars: MIT (`LICENSE`).
 - Antonio font: SIL OFL 1.1 (`web/static/fonts/Antonio-OFL.txt`).
 - hls.js 1.7.3: Apache 2.0 (`web/static/vendor/hls.LICENSE`).
+- pdf.js 6.4.299: Apache 2.0 (`web/static/vendor/pdfjs/LICENSE`; its image decoders' licences in `wasm/`, the fonts' beside them).
 - The image is Jellyfin (GPL-2.0, https://github.com/jellyfin/jellyfin) with LCARS added.
