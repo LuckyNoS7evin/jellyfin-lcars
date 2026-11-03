@@ -107,7 +107,7 @@ func newProxy(target *url.URL) http.Handler {
 	return &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.SetURL(target)
-			pr.SetXForwarded()
+			forwardFor(pr)
 			// Jellyfin doesn't need a reverse proxy's or an auth gateway's cookies.
 			pr.Out.Header.Del("Cookie")
 		},
@@ -118,6 +118,26 @@ func newProxy(target *url.URL) http.Handler {
 			}
 			http.Error(w, "jellyfin unreachable", http.StatusBadGateway)
 		},
+	}
+}
+
+// forwardFor tells Jellyfin who the client is. The proxy drops incoming X-Forwarded-* headers;
+// this puts back what a proxy in front of LCARS (NPM) sent and adds the direct peer, so Jellyfin
+// (with LCARS in its Known Proxies) sees the real client: LAN or remote, bitrate limits, the
+// activity log. A client can prepend made-up entries, but Jellyfin reads from the right and
+// stops at the first address that isn't a known proxy, which is the one added here.
+func forwardFor(pr *httputil.ProxyRequest) {
+	in := pr.In.Header
+	if v := in.Values("X-Forwarded-For"); len(v) > 0 {
+		pr.Out.Header["X-Forwarded-For"] = v
+	}
+	pr.SetXForwarded() // appends the peer; sets Host and Proto from this request
+	// Keep the scheme and host the client used at the first proxy (https at NPM).
+	if v := in.Get("X-Forwarded-Proto"); v != "" {
+		pr.Out.Header.Set("X-Forwarded-Proto", v)
+	}
+	if v := in.Get("X-Forwarded-Host"); v != "" {
+		pr.Out.Header.Set("X-Forwarded-Host", v)
 	}
 }
 

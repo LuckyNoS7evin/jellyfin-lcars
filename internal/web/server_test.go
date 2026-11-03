@@ -129,3 +129,32 @@ func TestBodyLimit(t *testing.T) {
 		}
 	}
 }
+
+func TestForwardedFor(t *testing.T) {
+	var got *http.Request
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { got = r }))
+	defer up.Close()
+	h := newTestServer(t, up)
+
+	// Straight from a LAN client (the test allowlist is 192.0.2.0/24): its address.
+	r := httptest.NewRequest("GET", "/jf/System/Info", nil)
+	r.RemoteAddr = "192.0.2.15:4000"
+	h.ServeHTTP(httptest.NewRecorder(), r)
+	if v := got.Header.Get("X-Forwarded-For"); v != "192.0.2.15" {
+		t.Errorf("direct: X-Forwarded-For %q", v)
+	}
+
+	// Through NPM: NPM's chain, then NPM's own address; NPM's scheme and host kept.
+	r = httptest.NewRequest("GET", "/jf/System/Info", nil)
+	r.RemoteAddr = "192.0.2.1:5000"
+	r.Header.Set("X-Forwarded-For", "203.0.113.7")
+	r.Header.Set("X-Forwarded-Proto", "https")
+	r.Header.Set("X-Forwarded-Host", "jellyfin.example.org")
+	h.ServeHTTP(httptest.NewRecorder(), r)
+	if v := got.Header.Get("X-Forwarded-For"); v != "203.0.113.7, 192.0.2.1" {
+		t.Errorf("via proxy: X-Forwarded-For %q", v)
+	}
+	if got.Header.Get("X-Forwarded-Proto") != "https" || got.Header.Get("X-Forwarded-Host") != "jellyfin.example.org" {
+		t.Errorf("via proxy: proto %q host %q", got.Header.Get("X-Forwarded-Proto"), got.Header.Get("X-Forwarded-Host"))
+	}
+}
