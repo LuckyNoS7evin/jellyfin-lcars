@@ -710,9 +710,11 @@ a.card-t:hover, a.card-s:hover, a.card-t:focus-visible, a.card-s:focus-visible {
 .rc-vol .scrub.vol::after { background: repeating-linear-gradient(90deg, transparent 0 14px, var(--lilac) 14px 17px); }
 .rc-vol .scrub.vol .pos { background: #000; }
 .rc-vol .scrub.vol.muted .pos { background: transparent; }
-.rc-opts { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; margin-top: 14px; }
-.rc-sel { display: grid; gap: 4px; min-width: min(280px, 100%); }
-.rc-sel span { color: var(--lilac); font-size: 14px; letter-spacing: .08em; }
+.rc-opts { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-top: 14px; }
+/* A label beside its control (as "Upload as"), not above it. */
+.rc-sel { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.rc-sel span { color: var(--lilac); font-size: 15px; letter-spacing: .06em; white-space: nowrap; }
+.rc-sel .sel { min-width: 12em; }
 .np .scrub { margin-top: 6px; }
 a.np-title:hover, a.np-title:focus-visible { text-decoration: underline; outline: none; }
 /* Play on: a block at the end of the header bar, then a rounded cap (as a deck header's code) */

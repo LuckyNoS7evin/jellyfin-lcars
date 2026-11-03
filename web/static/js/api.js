@@ -116,6 +116,16 @@ export class Api {
   }
 
   get(path, query, opts) { return this.req('GET', path, { ...opts, query }); }
+  /** A plain-text response (log files). */
+  async text(path, query, { signal } = {}) {
+    let res;
+    try { res = await fetch(this.base + path + q(query), { headers: { Authorization: this.authHeader() }, signal }); } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      throw new ApiError(0, 'Server unreachable');
+    }
+    if (!res.ok) throw new ApiError(res.status, res.statusText || `HTTP ${res.status}`);
+    return res.text();
+  }
   post(path, body, query, opts) { return this.req('POST', path, { ...opts, body, query }); }
   del(path, query, opts) { return this.req('DELETE', path, { ...opts, query }); }
 

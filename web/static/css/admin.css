@@ -141,7 +141,7 @@
 .eng-user-none { line-height: 1; padding-bottom: .13em; box-sizing: border-box; }
 
 /* item tools (A8) */
-.eng-edit { display: grid; gap: 14px; }
+.eng-edit { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
 .eng-edit-head { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: end; justify-content: space-between; }
 .eng-edit-head > div:first-child { display: grid; gap: 2px; }
 .eng-edit-t { color: var(--orange); font-size: 30px; font-weight: 700; text-decoration: none; line-height: 1; }
@@ -210,3 +210,50 @@
 .eng-imgopt > span { color: var(--peach); }
 .eng-imgopt .numbox { width: 110px; }
 .eng-imgopt .inp.num { height: var(--ctl-h); text-align: center; }
+
+/* operations (A5) */
+.set-row[hidden] { display: none; }
+.eng-tasks { display: grid; gap: 8px; }
+.eng-taskrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 14px; align-items: center; padding: 8px 12px; background: #0e0d14; border-radius: 0 16px 16px 0; border-left: 6px solid var(--sc, var(--orange)); }
+.eng-taskrow.running { background: #1a1408; }
+.eng-taskrow-b { display: grid; gap: 4px; min-width: 0; }
+.eng-taskrow-n { color: var(--orange); font-size: 19px; font-weight: 700; text-decoration: none; }
+.eng-taskrow-n:hover, .eng-taskrow-n:focus-visible { text-decoration: underline; outline: none; }
+.eng-taskrow-a { display: flex; gap: 8px; }
+.eng-task-last { display: inline-flex; gap: 8px; align-items: center; color: var(--lilac); font-size: 14px; }
+.eng-err { margin-top: 10px; padding: 8px 12px; border-left: 6px solid var(--alert); background: #1f0a08; border-radius: 0 12px 12px 0; }
+.eng-err b { color: var(--alert); text-transform: none; }
+.eng-err pre { margin: 6px 0 0; white-space: pre-wrap; color: var(--peach); font-size: 13px; max-height: 18em; overflow: auto; }
+.eng-trigs { display: grid; gap: 8px; margin-bottom: 10px; }
+.eng-trig { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 4px 6px 4px 14px; background: #15131c; border-radius: 20px; }
+.eng-trig span { color: var(--peach); text-transform: none; }
+.eng-filters { margin: 0 0 12px; align-items: center; }
+.eng-filters .grow { flex: 1; min-width: 200px; }
+.eng-filters .grow .inp { width: 100%; }
+.eng-acts { display: grid; }
+.eng-actrow { display: grid; grid-template-columns: 13ch minmax(0, 1fr) auto; gap: 4px 14px; padding: 7px 0; border-bottom: 1px solid #1b1a26; align-items: start; }
+.eng-actrow-t { color: var(--dim); font-size: 14px; font-variant-numeric: tabular-nums; }
+.eng-actrow-b { display: grid; gap: 2px; min-width: 0; }
+.eng-actrow-b details summary { color: var(--sky); font-size: 13px; cursor: pointer; }
+.eng-actrow-b details pre { white-space: pre-wrap; color: var(--peach); font-size: 13px; margin: 4px 0 0; }
+.eng-actrow-k { display: flex; gap: 6px; align-items: center; color: var(--dim); font-size: 13px; }
+.eng-actrow.sev-warning .eng-act-n { color: var(--yellow); }
+.eng-actrow.sev-error .eng-act-n, .eng-actrow.sev-critical .eng-act-n { color: var(--alert); }
+.eng-logs { display: grid; gap: 6px; }
+.eng-logrow { display: grid; grid-template-columns: minmax(0, 1fr) 10ch 16ch; gap: 12px; padding: 8px 14px; background: #0e0d14; border-left: 6px solid var(--blue); border-radius: 0 16px 16px 0; text-decoration: none; }
+.eng-logrow b { color: var(--orange); text-transform: none; overflow-wrap: anywhere; }
+.eng-logrow span { color: var(--lilac); font-size: 14px; text-align: right; }
+.eng-logrow:hover, .eng-logrow:focus-visible { background: #1a1826; outline: none; }
+.eng-logview { height: 68vh; overflow: auto; background: #050508; border: 2px solid #1b1a26; border-radius: 12px; padding: 8px 12px;
+  font: 13px/1.45 ui-monospace, monospace; color: var(--peach); text-transform: none; }
+.eng-logline { white-space: pre; }
+.eng-logview.wrap .eng-logline { white-space: pre-wrap; overflow-wrap: anywhere; }
+.eng-logline.wrn { color: var(--yellow); }
+.eng-logline.err { color: var(--alert); }
+.eng-logline.dbg { color: var(--dim); }
+.eng-actrow-b .eng-act-o { grid-column: auto; }
+/* Decks stacked in one column, with the usual gap between them. */
+.eng-stack { display: grid; gap: 16px; }
+/* Long unwrapped log lines scroll inside the viewer, not the page. */
+.eng-edit .deck, .eng-edit .deck-body { min-width: 0; }
+.eng-logview { width: 100%; max-width: 100%; box-sizing: border-box; }
