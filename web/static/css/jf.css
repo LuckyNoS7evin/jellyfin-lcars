@@ -76,14 +76,40 @@
 .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 16px 0; }
 
 .sel, .inp {
-  height: 40px; background: #000; color: var(--peach); border: 2px solid var(--sc, var(--blue)); border-radius: 20px; padding: 0 16px;
+  --edge: var(--sc, var(--blue));
+  height: 40px; background: #000; color: var(--peach); border: 2px solid var(--edge); border-radius: 20px; padding: 0 16px;
   font: 400 17px "Antonio", sans-serif; text-transform: uppercase; letter-spacing: .04em; min-width: 0;
 }
 .inp { text-transform: none; }
 /* Selects and inputs centre Antonio's font box, which leaves its capitals ~0.067em low;
    bottom padding of twice that lifts them back to centre. */
 .sel, .inp { padding-bottom: .13em; }
-.sel:focus, .inp:focus { outline: none; border-color: var(--orange); }
+.sel:focus, .inp:focus, .numbox:focus-within .inp { outline: none; --edge: var(--orange); }
+
+/* Dropdowns, number boxes and dates end in an LCARS segment the colour of their border, with a
+   black arrow, instead of the browser's own arrow, spinners and calendar button. */
+:root { --seg: 30px; }
+.sel {
+  appearance: none; -webkit-appearance: none; padding-right: calc(var(--seg) + 12px);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M0 0h12L6 8z'/%3E%3C/svg%3E") no-repeat right 9px center / 12px 8px,
+    linear-gradient(to left, var(--edge) var(--seg), #000 var(--seg));
+}
+.sel option { background: #000; color: var(--peach); }
+.inp[type=number] { -moz-appearance: textfield; appearance: textfield; }
+.inp[type=number]::-webkit-inner-spin-button, .inp[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.numbox { --edge: var(--sc, var(--blue)); position: relative; display: inline-flex; min-width: 0; }
+.numbox:focus-within { --edge: var(--orange); }
+.numbox .inp { width: 100%; padding-right: calc(var(--seg) + 6px); }
+.numbox .steps { position: absolute; inset: 2px 2px 2px auto; width: calc(var(--seg) - 2px); display: grid; grid-template-rows: 1fr 1fr;
+  border-radius: 0 999px 999px 0; overflow: hidden; }
+.numbox .steps button { border: 0; padding: 0; margin: 0; background: var(--edge); color: #000; cursor: pointer; display: grid; place-items: center; }
+.numbox .steps button:hover, .numbox .steps button:focus-visible { filter: brightness(1.25); outline: none; }
+.numbox .steps .arw { height: auto; }
+.numbox .steps .arw i { border-inline-width: 5px; border-block-width: 0; border-inline-style: solid; }
+.numbox .steps .arw.u i { border-bottom-width: 6px; }
+.numbox .steps .arw.d i { border-top-width: 6px; }
+.inp[type=date] { background: linear-gradient(to left, var(--edge) var(--seg), #000 var(--seg)); }
+.inp[type=date]::-webkit-calendar-picker-indicator { filter: brightness(0); cursor: pointer; margin-right: -4px; padding: 4px; }
 .picks { display: flex; flex-wrap: wrap; gap: 10px 18px; margin: 10px 0; }
 .pick { display: grid; gap: 3px; min-width: 0; }
 .pick > span { font-size: 13px; color: var(--lilac); letter-spacing: .1em; }
@@ -91,7 +117,7 @@
 
 .search-bar { display: flex; gap: var(--gap); align-items: stretch; margin-bottom: 18px; }
 .search-bar .cap { width: 26px; background: var(--orange); border-radius: 24px 0 0 24px; flex: none; }
-.search-bar .inp { flex: 1; height: 48px; border-radius: 0 24px 24px 0; font-size: 22px; border-color: var(--orange); }
+.search-bar .inp { flex: 1; height: 48px; border-radius: 0 24px 24px 0; font-size: 22px; --edge: var(--orange); }
 
 /* ---- details ---------------------------------------------------------------------------- */
 .hero { position: relative; min-height: 340px; }
@@ -347,7 +373,7 @@
 }
 
 /* ---- library filters ------------------------------------------------------------------------- */
-.tabs .sel { height: 32px; border-radius: 16px; font-size: 16px; padding: 0 12px .13em; border-color: var(--sc, var(--peach)); }
+.tabs .sel { height: 32px; border-radius: 16px; font-size: 16px; padding: 0 calc(var(--seg) + 10px) .13em 12px; --edge: var(--sc, var(--peach)); }
 .filters { border-left: 10px solid var(--sc, var(--lilac)); border-radius: 0 20px 20px 0; background: #0b0a10; padding: 6px 18px; margin: -4px 0 18px; display: grid; }
 .filters > .fgroup, .filters > div > .fgroup { padding: 12px 0; border-top: 1px solid #1f1d2b; }
 .filters > .fgroup:first-child { border-top: 0; }
@@ -368,7 +394,8 @@
    share one width, so a column of them lines up; long ones (text, lists) take the column. */
 :root { --ctl-h: 36px; --ctl-short: 140px; }
 .set-c .sel, .set-c .inp, .set-c .toggle, .eng-allor-h .toggle { height: var(--ctl-h); font-size: 16px; }
-.set-c .toggle, .set-c .inp.num, .eng-allor-h .toggle { width: var(--ctl-short); min-width: var(--ctl-short); flex: none; }
+.set-c .toggle, .set-c .inp.num, .set-c .numbox, .eng-allor-h .toggle { width: var(--ctl-short); min-width: var(--ctl-short); flex: none; }
+.set-c .numbox .inp.num { width: 100%; min-width: 0; }
 .set-c .inp.num { text-align: center; padding-inline: 8px; }
 /* Dates are short controls too, the width of the numbers beside them. */
 .set-c .inp.date { width: var(--ctl-short); min-width: var(--ctl-short); flex: none; padding-inline: 10px 6px; }

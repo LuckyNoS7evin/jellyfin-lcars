@@ -353,3 +353,18 @@ export async function squareJpeg(file) {
   c.getContext('2d').drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, c.width, c.height);
   return c.toDataURL('image/jpeg', 0.88).split(',')[1];
 }
+
+/**
+ * A number input with an LCARS stepper: an always-visible segment on the right, ▲ and ▼ in
+ * black on the border's colour. Steps keep to the input's min, max and step, and fire "input"
+ * as typing would.
+ */
+export function numberBox(input) {
+  const step = dir => {
+    try { if (dir > 0) input.stepUp(); else input.stepDown(); } catch { return; }
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  const b = (dir, title) => h('button', { type: 'button', tabindex: -1, title, attrs: { 'aria-label': title }, onclick: () => step(dir) }, arrow(dir > 0 ? 'u' : 'd'));
+  return h('span.numbox', input, h('span.steps', b(1, 'Up'), b(-1, 'Down')));
+}

@@ -208,4 +208,5 @@
 .eng-imgopts { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-bottom: 10px; }
 .eng-imgopt { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .eng-imgopt > span { color: var(--peach); }
-.eng-imgopt .inp.num { width: 90px; height: var(--ctl-h); text-align: center; }
+.eng-imgopt .numbox { width: 110px; }
+.eng-imgopt .inp.num { height: var(--ctl-h); text-align: center; }

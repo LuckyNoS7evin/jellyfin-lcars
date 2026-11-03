@@ -2,7 +2,7 @@
 // libraryoptionseditor): the list, adding a library, editing one (name, folders, options), and the
 // library-wide Display, Metadata and NFO settings.
 import { h, fill } from '../h.js';
-import { deck, btn, tag, empty, toast, errorBox } from '../ui.js';
+import { deck, btn, tag, empty, toast, errorBox, numberBox } from '../ui.js';
 import { confirmDialog, dialog, refreshDialog } from '../menu.js';
 import { editForm, row, pickFolder } from './form.js';
 
@@ -354,7 +354,7 @@ function imageOptions(fo, i, ty) {
       lim.addEventListener('input', () => put(type, { Limit: Number(lim.value) || 0 }));
       const w = h('input.inp.num', { type: 'number', value: o.MinWidth, attrs: { min: 0, step: 10, title: 'Minimum width (px)' } });
       w.addEventListener('input', () => put(type, { MinWidth: Number(w.value) || 0 }));
-      return h('div.eng-imgopt', h('span', `${type}s`), h('label.eng-inline', h('span', 'How many'), lim), h('label.eng-inline', h('span', 'Min width'), w));
+      return h('div.eng-imgopt', h('span', `${type}s`), h('label.eng-inline', h('span', 'How many'), numberBox(lim)), h('label.eng-inline', h('span', 'Min width'), numberBox(w)));
     }
     const b = h('button.eng-check', { type: 'button', class: o.Limit > 0 ? 'on' : '' }, type);
     b.addEventListener('click', () => { put(type, { Limit: get(type).Limit > 0 ? 0 : 1 }); sync(); });

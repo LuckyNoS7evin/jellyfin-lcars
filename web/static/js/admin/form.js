@@ -2,7 +2,7 @@
 // bar that appears once something changed (Save, Revert). Server settings affect everyone, so
 // nothing is saved until Save, unlike the user's own settings. Leaving with unsaved changes asks.
 import { h, fill } from '../h.js';
-import { btn, arrow, toast } from '../ui.js';
+import { btn, arrow, toast, numberBox } from '../ui.js';
 import { dialog, confirmDialog } from '../menu.js';
 
 const copy = v => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
@@ -97,7 +97,7 @@ export function editForm({ load, save, restartKeys = [], app }) {
       if (int) v = Math.round(v);
       f.set(key, v);
     });
-    return control(i, sync);
+    return control(numberBox(i), sync);
   };
 
   /** Ticks in a list: the value is an array of the chosen ids. items: [[label, id], ...]. */

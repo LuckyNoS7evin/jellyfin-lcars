@@ -5,7 +5,7 @@
 import { h, fill } from '../h.js';
 import { TICKS } from '../api.js';
 import * as f from '../fmt.js';
-import { deck, btn, arrow, tag, empty, toast, loading, errorBox, epCode } from '../ui.js';
+import { deck, btn, arrow, tag, empty, toast, loading, errorBox, epCode, numberBox } from '../ui.js';
 import { confirmDialog } from '../menu.js';
 import { editForm, row } from './form.js';
 
@@ -361,7 +361,7 @@ async function identify(ctx, item) {
     } catch (err) { toast('Unable to comply', err.message, 'red'); }
   }
   const form = h('form.set-form', { onsubmit: search },
-    row('Name', name), row('Year', year),
+    row('Name', name), row('Year', numberBox(year)),
     idIns.map(([x, i]) => row(`${x.Name}${x.Type ? ` (${x.Type})` : ''}`, i)),
     row('Replace existing images', replaceT),
     h('div.actions', btn('Search', null, { type: 'submit', color: 'orange' })));
