@@ -253,7 +253,13 @@ export async function library(ctx) {
     } finally {
       busy = false;
     }
-    if (start < total) requestAnimationFrame(() => { if (sentinel.getBoundingClientRect().top < window.innerHeight + 800) more(); });
+    if (start < total) requestAnimationFrame(nearEnd);
+  }
+  // Load more once the end of the grid is within 800 px of the screen. Measured here as well as
+  // by the IntersectionObserver below: in a cross-origin frame (Jellyfin's LG TV app shows LCARS
+  // in one) the observer ignores its margin, and a remote can't scroll past the last row.
+  function nearEnd() {
+    if (start < total && sentinel.isConnected && sentinel.getBoundingClientRect().top < window.innerHeight + 800) more();
   }
 
   // ---- play all / shuffle ---------------------------------------------------------------------
@@ -378,7 +384,11 @@ export async function library(ctx) {
   }
 
   const stop = whenVisible(sentinel, more);
-  signal.addEventListener('abort', stop);
+  let scrollTimer = null;
+  const onScroll = () => { clearTimeout(scrollTimer); scrollTimer = setTimeout(nearEnd, 100); };
+  document.addEventListener('scroll', onScroll, { capture: true, passive: true }); // any scroller (main, the window)
+  grid.addEventListener('focusin', onScroll); // a remote moving down the rows
+  signal.addEventListener('abort', () => { stop(); clearTimeout(scrollTimer); document.removeEventListener('scroll', onScroll, { capture: true }); });
   more();
   return node;
 }

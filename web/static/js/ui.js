@@ -338,7 +338,20 @@ export function whenVisible(el, fn) {
     if (entries.some(e => e.isIntersecting)) fn();
   }, { rootMargin: '800px 0px' });
   io.observe(el);
-  return () => io.disconnect();
+  // In a cross-origin frame (Jellyfin's LG TV app shows LCARS in one) the observer ignores its
+  // margin, so measure on scrolling and focus moves too.
+  let t = null;
+  const check = () => {
+    clearTimeout(t);
+    t = setTimeout(() => {
+      if (!el.isConnected) return;
+      const r = el.getBoundingClientRect();
+      if (r.top < innerHeight + 800 && r.bottom > -800) fn();
+    }, 120);
+  };
+  document.addEventListener('scroll', check, { capture: true, passive: true });
+  document.addEventListener('focusin', check);
+  return () => { io.disconnect(); clearTimeout(t); document.removeEventListener('scroll', check, { capture: true }); document.removeEventListener('focusin', check); };
 }
 
 /**

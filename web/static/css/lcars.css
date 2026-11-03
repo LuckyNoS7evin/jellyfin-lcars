@@ -335,7 +335,14 @@ ul { list-style: none; }
   .row .seg { flex-basis: 28%; }
 }
 
-/* TV remote (tv.js): where focus is, clearly, from across the room */
-.tv :focus { outline: 4px solid #fff; outline-offset: 3px; border-radius: 8px; }
-.tv .card:focus, .tv a:focus > .card, .tv .card:focus-within { transform: scale(1.04); transition: transform .12s; }
-.tv :focus:not(:focus-visible) { outline: 4px solid #fff; }
+/* TV remote (tv.js): where focus is, clearly, from across the room. Drawn inside the control,
+   never outside it or by enlarging it: rows and the rail clip anything that spills over their
+   edge (the first library in a row, a pill at the screen's edge). */
+.tv :focus, .tv :focus:not(:focus-visible) { outline: 4px solid #fff; outline-offset: -4px; }
+.tv .card-link { position: relative; display: block; }
+.tv .card-link:focus { outline: none; }
+.tv .card-link:focus::after { content: ""; position: absolute; inset: 0; border: 4px solid #fff; border-radius: inherit;
+  box-shadow: inset 0 0 0 2px #000; pointer-events: none; z-index: 3; }
+/* A remote can't hover, and OK on a card opens it: the card's own buttons (play, watched,
+   favourite, ⋯) and multi-select are for pointers. The title page has all of them. */
+.tv .card-ov, .tv .card-sel { display: none !important; }
