@@ -30,7 +30,7 @@ docker run -d --name jellyfin-lcars -p 8080:8080 --read-only \
   ghcr.io/luckynos7evin/jellyfin-lcars:latest
 ```
 
-Then open `http://<this host>:8080` and sign in with your Jellyfin account. `compose.example.yml` is the same as a Compose service, with the hardening options. Tags: `latest` (newest main), the first 7 characters of each commit on main, and `v*` releases.
+Then open `http://<this host>:8080` and sign in with your Jellyfin account. `compose.example.yml` is the same as a Compose service, with the hardening options. `compose.with-jellyfin.yml` runs Jellyfin and LCARS together, with Jellyfin's own web UI turned off (`JELLYFIN_hostwebclient=false`); that also turns off Jellyfin's admin dashboard, so the file says how to bring it back for setup. Tags: `latest` (newest main), the first 7 characters of each commit on main, and `v*` releases.
 
 | Variable | Default | |
 |---|---|---|
