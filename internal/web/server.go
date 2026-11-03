@@ -45,9 +45,11 @@ func (s *Server) Handler() http.Handler {
 }
 
 // blob: is for hls.js (MediaSource object URLs and its worker) and libbitsub's worker.
+// img-src https: lets the admin image search and Identify show the metadata providers' artwork
+// (TMDb, TVDB, fanart.tv...) as the official client does; images only, no scripts or fetches.
 // 'wasm-unsafe-eval' lets the subtitle renderers (libass, libbitsub) compile WebAssembly;
 // it does not allow eval() of JavaScript.
-const csp = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; " +
+const csp = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob: https:; " +
 	"media-src 'self' blob:; worker-src 'self' blob:; font-src 'self'; connect-src 'self'; " +
 	"manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 

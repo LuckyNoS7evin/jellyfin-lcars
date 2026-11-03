@@ -10,6 +10,10 @@ import { confirmDialog } from '../menu.js';
 export const SECTIONS = [
   { id: 'overview', label: 'Overview', n: 'E-01', color: 'orange', load: () => import('./overview.js').then(m => m.overview) },
   { id: 'users', label: 'Users', n: 'E-02', color: 'sky', load: () => import('./users.js').then(m => m.users) },
+  // Item tools (A8), opened from an item's ⋯ menu rather than the rail. Subtitle managers who
+  // aren't admins may use the subtitle tool.
+  { id: 'edit', hidden: true, load: () => import('./edit.js').then(m => m.edit),
+    allow: (app, rest) => isAdmin(app) || (rest[1] === 'subtitles' && !!app.me?.Policy?.EnableSubtitleManagement) },
 ];
 
 let cssLoaded = false;
@@ -24,20 +28,20 @@ export const isAdmin = app => !!app.me?.Policy?.IsAdministrator;
 /** #/admin/<section>[/...]: the shell around a section's page. */
 export async function admin(ctx) {
   const { app, params } = ctx;
-  if (!isAdmin(app)) { location.replace('#/home'); return h('div'); }
   loadCss(app);
   const [id = 'overview', ...rest] = (params.sub || '').split('/').filter(Boolean);
   const section = SECTIONS.find(s => s.id === id);
-  if (!section) { location.replace('#/admin/overview'); return h('div'); }
-  ctx.setParent(id === 'overview' ? '#/home' : '#/admin/overview');
+  if (!section) { location.replace(isAdmin(app) ? '#/admin/overview' : '#/home'); return h('div'); }
+  if (!(section.allow ? section.allow(app, rest) : isAdmin(app))) { location.replace('#/home'); return h('div'); }
+  if (!section.hidden) ctx.setParent(id === 'overview' ? '#/home' : '#/admin/overview');
   const view = await section.load();
   const page = await view({ ...ctx, sub: rest });
   return h('div.eng-page', await restartBanner(ctx), page);
 }
 
 /** The rail while in the dashboard (app.js draws it with its own pill helper). */
-export function rail(path) {
-  return SECTIONS.map(s => ({ href: `#/admin/${s.id}`, n: s.n, label: s.label, color: s.color, active: path.startsWith(`/admin/${s.id}`) || (s.id === 'overview' && path === '/admin') }));
+export function rail(path, app) {
+  return SECTIONS.filter(s => !s.hidden && isAdmin(app)).map(s => ({ href: `#/admin/${s.id}`, n: s.n, label: s.label, color: s.color, active: path.startsWith(`/admin/${s.id}`) || (s.id === 'overview' && path === '/admin') }));
 }
 
 /** A red banner while the server waits for a restart (some settings only apply after one). */

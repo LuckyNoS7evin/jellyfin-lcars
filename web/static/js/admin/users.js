@@ -171,7 +171,7 @@ async function edit(ctx, userId) {
         sel(DAYS, s.DayOfWeek, v => put(i, 'DayOfWeek', v)),
         h('span', 'from'), sel(HOURS, s.StartHour, v => put(i, 'StartHour', Number(v))),
         h('span', 'to'), sel(HOURS, s.EndHour, v => put(i, 'EndHour', Number(v))),
-        btn('✕', () => { fo.set(P('AccessSchedules'), list.filter((_, j) => j !== i)); drawScheds(); }, { small: true, color: 'red', ghost: true, title: 'Remove' })))
+        btn('✕', () => { fo.set(P('AccessSchedules'), list.filter((_, j) => j !== i)); drawScheds(); }, { small: true, ico: true, color: 'red', ghost: true, title: 'Remove' })))
         : h('p.dlg-note', 'No schedule: the user may sign in at any time.'),
       btn('Add a time', () => { fo.set(P('AccessSchedules'), [...list, { DayOfWeek: 'Everyday', StartHour: 0, EndHour: 24 }]); drawScheds(); }, { small: true, color: 'blue' }));
   };

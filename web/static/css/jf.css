@@ -366,10 +366,12 @@
 .set-c .sel, .set-c .inp { width: 100%; }
 /* One size for every settings control: 36 px tall, 16 px text. Short ones (switches, numbers)
    share one width, so a column of them lines up; long ones (text, lists) take the column. */
-:root { --ctl-h: 36px; --ctl-short: 128px; }
+:root { --ctl-h: 36px; --ctl-short: 140px; }
 .set-c .sel, .set-c .inp, .set-c .toggle, .eng-allor-h .toggle { height: var(--ctl-h); font-size: 16px; }
 .set-c .toggle, .set-c .inp.num, .eng-allor-h .toggle { width: var(--ctl-short); min-width: var(--ctl-short); flex: none; }
 .set-c .inp.num { text-align: center; padding-inline: 8px; }
+/* Dates are short controls too, the width of the numbers beside them. */
+.set-c .inp.date { width: var(--ctl-short); min-width: var(--ctl-short); flex: none; padding-inline: 10px 6px; }
 .toggle { border-radius: calc(var(--ctl-h) / 2); }
 /* Small buttons on settings pages (Add a time, Add picture, Authorise a device...) match the
    controls beside them; at 32 px their bold text rendered soft on the pale colours. */
@@ -561,6 +563,15 @@ a.card-t:hover, a.card-s:hover, a.card-t:focus-visible, a.card-s:focus-visible {
 .arw i { width: 0; height: 0; border-block: 6px solid transparent; }
 .arw.r i { border-left: 9px solid currentColor; }
 .arw.l i { border-right: 9px solid currentColor; }
+.arw.u i, .arw.d i { border-block: 0; border-inline: 6px solid transparent; }
+.arw.u i { border-bottom: 9px solid currentColor; }
+.arw.d i { border-top: 9px solid currentColor; }
+/* Round icon buttons (arrows, ✕): a circle the height of the controls, the icon in its middle. */
+.btn.small.ico { width: var(--ctl-h, 36px); min-width: 0; height: var(--ctl-h, 36px); padding: 0; justify-content: center; border-radius: 50%; }
+.btn.small.ico .arw { height: auto; }
+.btn.small .arw.u i, .btn.small .arw.d i { border-block-width: 0; border-inline-width: 6px; border-inline-style: solid; }
+.btn.small .arw.u i { border-bottom-width: 9px; }
+.btn.small .arw.d i { border-top-width: 9px; }
 .btn.small .arw i { border-block-width: 5px; border-left-width: 8px; border-right-width: 0; }
 .btn.small .arw.l i { border-left-width: 0; border-right-width: 8px; }
 

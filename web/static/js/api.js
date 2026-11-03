@@ -96,8 +96,16 @@ export class Api {
       let msg = res.statusText || `HTTP ${res.status}`;
       try {
         let t = await res.text();
-        // Jellyfin often sends the reason as a JSON string ("..." with the quotes).
+        // Jellyfin often sends the reason as a JSON string ("..." with the quotes), and ASP.NET
+        // validation failures as a problem document: show "Field: what's wrong" instead.
         if (/^".*"$/s.test(t)) { try { t = JSON.parse(t); } catch { /* keep it as is */ } }
+        else if (/^\{.*"title"/s.test(t)) {
+          try {
+            const p = JSON.parse(t);
+            const errs = Object.entries(p.errors || {}).map(([k, v]) => `${k}: ${[].concat(v).join(' ')}`);
+            t = errs.length ? errs.join('; ') : p.detail || p.title || t;
+          } catch { /* keep it as is */ }
+        }
         if (t && t.length < 300) msg = t;
       } catch { /* ignore */ }
       throw new ApiError(res.status, msg);

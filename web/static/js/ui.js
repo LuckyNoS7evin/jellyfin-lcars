@@ -44,13 +44,14 @@ export function errorBox(e, what = 'Unable to comply') {
  * Arrow drawn in CSS: Antonio's ◂ ▸ ‹ › glyphs sit low in buttons. dir 'l' | 'r', n triangles.
  */
 export function arrow(dir, n = 1) {
-  return h('span.arw', { class: dir === 'l' ? 'l' : 'r', attrs: { 'aria-hidden': 'true' } }, Array.from({ length: n }, () => h('i')));
+  return h('span.arw', { class: ['l', 'u', 'd'].includes(dir) ? dir : 'r', attrs: { 'aria-hidden': 'true' } }, Array.from({ length: n }, () => h('i')));
 }
 
-export function btn(label, onclick, { color, small, ghost, title, disabled, type = 'button' } = {}) {
+export function btn(label, onclick, { color, small, ghost, title, disabled, type = 'button', ico } = {}) {
   return h('button.btn', {
     type, onclick, title, disabled,
-    class: [color && `c-${color}`, small && 'small', ghost && 'ghost'].filter(Boolean).join(' '),
+    class: [color && `c-${color}`, small && 'small', ghost && 'ghost', ico && 'ico'].filter(Boolean).join(' '),
+    attrs: ico && title ? { 'aria-label': title } : undefined,
   }, label);
 }
 

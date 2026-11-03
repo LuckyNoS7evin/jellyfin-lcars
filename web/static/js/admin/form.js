@@ -152,6 +152,14 @@ export function editForm({ load, save, restartKeys = [], app }) {
     return control(i, sync);
   };
 
+  /** A date (Jellyfin keeps ISO dates; this shows and edits the day). Empty stores null. */
+  f.date = key => {
+    const i = h('input.inp.date', { type: 'date' });
+    const sync = () => { const v = f.get(key); i.value = v ? String(v).slice(0, 10) : ''; };
+    i.addEventListener('input', () => f.set(key, i.value ? `${i.value}T00:00:00.0000000Z` : null));
+    return control(i, sync);
+  };
+
   /** A path with a Browse button (the folder picker). */
   f.path = (key, api) => {
     const i = h('input.inp', { attrs: { spellcheck: 'false' } });

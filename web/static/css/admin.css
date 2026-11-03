@@ -11,7 +11,7 @@
 .lcars.eng .e-hdr .elbow-code::after { content: " ENG"; }
 
 .eng-page { display: grid; gap: 16px; }
-.eng-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.eng-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .eng-col { display: grid; gap: 16px; min-width: 0; }
 @media (max-width: 1100px) { .eng-grid { grid-template-columns: minmax(0, 1fr); } }
 
@@ -79,7 +79,9 @@
 .eng-savebar b { color: var(--orange); letter-spacing: .06em; }
 .eng-save-msg { color: var(--alert); text-transform: none; }
 .eng-savebar .grow { flex: 1; }
-.inp.area { min-height: 8em; resize: vertical; font-family: ui-monospace, monospace; text-transform: none; }
+.inp.area { min-height: 8em; resize: vertical; text-transform: none; padding-block: 8px; line-height: 1.35; border-radius: 18px; }
+/* Code-ish text (lyrics) in a fixed-width font. */
+.inp.area.eng-lrc { font-family: ui-monospace, monospace; }
 .eng-path { display: flex; gap: 8px; align-items: center; }
 .eng-path .inp { flex: 1; min-width: 0; text-transform: none; }
 .eng-dirs { display: grid; gap: 4px; max-height: 50vh; overflow: auto; margin-top: 10px; }
@@ -137,3 +139,47 @@
 .set-c .eng-tagbox, .set-c .eng-path { width: 100%; }
 /* Antonio's capitals sit ~0.067em low in their box: lift the placeholder letter to the middle. */
 .eng-user-none { line-height: 1; padding-bottom: .13em; box-sizing: border-box; }
+
+/* item tools (A8) */
+.eng-edit { display: grid; gap: 14px; }
+.eng-edit-head { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: end; justify-content: space-between; }
+.eng-edit-head > div:first-child { display: grid; gap: 2px; }
+.eng-edit-t { color: var(--orange); font-size: 30px; font-weight: 700; text-decoration: none; line-height: 1; }
+.eng-edit-t:hover, .eng-edit-t:focus-visible { text-decoration: underline; outline: none; }
+.eng-edit-head span { color: var(--lilac); }
+.eng-edit-head .tabs { margin: 0; }
+.eng-ro { color: var(--dim); font-size: 14px; text-transform: none; overflow-wrap: anywhere; }
+.inp.date { width: 100%; color-scheme: dark; }
+.eng-people { display: grid; gap: 8px; justify-items: start; }
+.eng-person { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) auto auto auto; gap: 6px; align-items: center; width: 100%; }
+.eng-lrc { width: 100%; min-height: 24em; font-size: 15px; }
+.eng-imgs { display: flex; flex-wrap: wrap; gap: 12px; }
+.eng-img { display: grid; gap: 4px; width: 200px; }
+.eng-imgs.remote .eng-img { width: 180px; }
+.eng-img img { width: 100%; height: 150px; object-fit: contain; background: #0e0d14; border-radius: 6px; }
+.eng-img-m { display: flex; justify-content: space-between; gap: 6px; color: var(--lilac); font-size: 13px; text-transform: none; }
+.eng-img-a { display: flex; gap: 6px; flex-wrap: wrap; }
+.eng-img-a .btn.small:not(.ico) { min-width: 0; padding: 0 14px; }
+.eng-ident { display: grid; gap: 10px; }
+.eng-ident-r { display: grid; grid-template-columns: 80px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 8px 10px; background: #0e0d14; border-left: 6px solid var(--sky); border-radius: 0 16px 16px 0; }
+.eng-ident-r img, .eng-ident-r .noimg { width: 80px; aspect-ratio: 2 / 3; object-fit: cover; }
+.eng-ident-b { display: grid; gap: 4px; min-width: 0; }
+.eng-ident-b b { color: var(--orange); font-size: 19px; }
+.eng-ident-b span { color: var(--lilac); font-size: 14px; }
+.eng-ident-b p { margin: 0; color: var(--peach); font-size: 14px; text-transform: none; }
+.eng-subs { display: grid; gap: 8px; }
+.eng-sub { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 8px 10px; background: #0e0d14; border-left: 6px solid var(--lilac); border-radius: 0 16px 16px 0; }
+.eng-sub b { color: var(--orange); grid-column: 1; }
+.eng-sub span { color: var(--lilac); font-size: 14px; grid-column: 1; text-transform: none; }
+.eng-sub .btn { grid-column: 2; grid-row: 1 / span 3; align-self: center; }
+/* Images: the toolbar on one line (label beside its list), the types side by side. */
+.eng-img-bar { align-items: center; }
+.eng-img-up { display: inline-flex; gap: 10px; align-items: center; }
+.eng-inline { display: inline-flex; gap: 8px; align-items: center; }
+.eng-inline span { color: var(--lilac); font-size: 15px; letter-spacing: .06em; white-space: nowrap; }
+.eng-inline .sel { height: 44px; min-width: 12em; }
+.eng-imgtypes { display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: start; }
+.eng-imgtype { display: grid; gap: 6px; }
+.eng-imgtype .set-h { margin: 8px 0 0; }
+/* Settings rows fill their deck in Engineering (elsewhere they stop at 1100 px). */
+.eng-page .set-row { max-width: none; }

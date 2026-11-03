@@ -70,7 +70,10 @@ function showMenu(ctx, it, anchor, onChange) {
   const admin = !!policy.IsAdministrator;
   const playable = ['Movie', 'Episode', 'Video', 'MusicVideo', 'Audio', 'Trailer'].includes(it.Type);
   const pos = ud.PlaybackPositionTicks || 0;
-  const official = path => window.open(api.url(`/web/#${path}`), '_blank', 'noopener');
+  // The item tools (admin/edit.js), for admins; subtitles also for subtitle managers.
+  const tool = t => () => { location.hash = `#/admin/edit/${it.Id}/${t}`; };
+  const video = ['Movie', 'Episode', 'Video', 'MusicVideo', 'Trailer'].includes(it.Type);
+  const onDisk = it.LocationType !== 'Virtual';
 
   const items = [
     playable && pos > 0 ? ['Resume', () => app.play(it, { resume: true })] : null,
@@ -119,7 +122,16 @@ function showMenu(ctx, it, anchor, onChange) {
     }] : null,
     '-',
     canRefreshMetadata(it, app.me) ? ['Refresh metadata…', () => refreshDialog(ctx, [it])] : null,
-    admin ? ['Edit metadata (official client)', () => official(`/details?id=${it.Id}&serverId=${api.session.serverId}`)] : null,
+    admin ? ['Edit metadata…', tool('metadata')] : null,
+    admin ? ['Edit images…', tool('images')] : null,
+    admin && onDisk && ['Movie', 'Trailer', 'Series', 'BoxSet', 'Person', 'Book', 'MusicAlbum', 'MusicArtist', 'MusicVideo'].includes(it.Type) ? ['Identify…', tool('identify')] : null,
+    (admin || policy.EnableSubtitleManagement) && video && onDisk ? ['Edit subtitles…', tool('subtitles')] : null,
+    admin && it.Type === 'Audio' ? ['Edit lyrics…', tool('lyrics')] : null,
+    // Undo a manual Group versions (several versions on one item).
+    admin && video && it.MediaSourceCount > 1 ? ['Split versions…', async () => {
+      const { splitVersions } = await import('./admin/edit.js');
+      if (await splitVersions(ctx, it)) onChange?.(it);
+    }] : null,
     it.CanDelete ? ['Delete…', async () => {
       const ok = await confirmDialog('Delete media', `Delete “${it.Name}” from the server and the disk? This cannot be undone.`, 'Delete');
       if (!ok) return;

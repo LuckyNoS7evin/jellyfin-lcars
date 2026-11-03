@@ -44,7 +44,7 @@ const ROUTES = [
 
 async function adminRoute(ctx) {
   const m = await import('./admin/admin.js');
-  app.adminRail = m.rail;
+  app.adminRail = p => m.rail(p, app);
   drawRail(currentPath());
   return m.admin(ctx);
 }
@@ -292,6 +292,17 @@ addSelectAction({
     }
     toast('Deleted', `${done} of ${items.length}`, 'red');
     app.refresh();
+    return null;
+  },
+});
+// Admins: make several films (or videos) versions of one item (official multiSelect).
+addSelectAction({
+  id: 'versions', label: 'Group versions', color: 'lilac',
+  when: items => isAdminUser() && items.length > 1 && (items.every(i => i.Type === 'Movie') || items.every(i => i.Type === 'Video')),
+  run: async items => {
+    const { groupVersions } = await import('./admin/edit.js');
+    if (await groupVersions({ api: app.api, app }, items)) app.refresh();
+    else return { keep: true };
     return null;
   },
 });
