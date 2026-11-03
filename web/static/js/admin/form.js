@@ -56,7 +56,9 @@ export function editForm({ load, save, restartKeys = [], app }) {
   f.ready = Promise.resolve(load()).then(v => { orig = copy(v); f.draft = copy(v); f.refresh(); return f; });
 
   // ---- controls: each keeps a sync() so Revert puts it back ---------------------------------
-  const control = (el, sync) => { f.controls.push({ sync }); return el; };
+  // Controls made after the settings have loaded (the usual case: pages await f.ready first)
+  // show their value straight away; ones made before are filled in when the load finishes.
+  const control = (el, sync) => { f.controls.push({ sync }); if (f.draft != null) sync(); return el; };
 
   f.toggle = (key, { invert = false } = {}) => {
     const b = h('button.toggle', { type: 'button', attrs: { role: 'switch' } });
@@ -78,15 +80,69 @@ export function editForm({ load, save, restartKeys = [], app }) {
     return control(s, sync);
   };
 
-  f.num = (key, { min, max, step = 1, empty: allowEmpty = false } = {}) => {
-    const i = h('input.inp.num', { type: 'number', attrs: { min, max, step, inputmode: 'numeric' } });
-    const sync = () => { const v = f.get(key); i.value = v == null ? '' : String(v); };
+  /**
+   * A number. scale: the stored value is shown divided by it (bits as Mbps: 1e6). zero: what an
+   * empty box stores (and a stored value of this shows as empty), for "0 = no limit" fields.
+   */
+  f.num = (key, { min, max, step = 1, scale = 1, zero = null, int = true, placeholder } = {}) => {
+    const i = h('input.inp.num', { type: 'number', attrs: { min, max, step, inputmode: 'decimal', placeholder } });
+    const sync = () => {
+      const v = f.get(key);
+      i.value = v == null || (zero != null && v === zero) ? '' : String(+(v / scale).toFixed(6));
+    };
     i.addEventListener('input', () => {
-      if (i.value === '' && allowEmpty) { f.set(key, null); return; }
-      const v = Number(i.value);
-      if (i.value !== '' && Number.isFinite(v)) f.set(key, v);
+      if (i.value === '') { f.set(key, zero); return; }
+      let v = Number(i.value) * scale;
+      if (!Number.isFinite(v)) return;
+      if (int) v = Math.round(v);
+      f.set(key, v);
     });
     return control(i, sync);
+  };
+
+  /** Ticks in a list: the value is an array of the chosen ids. items: [[label, id], ...]. */
+  f.checklist = (key, items, { disabledBy } = {}) => {
+    const el = h('div.eng-checks');
+    const sync = () => {
+      const on = new Set(f.get(key) || []);
+      const off = disabledBy ? !!f.get(disabledBy) : false;
+      el.classList.toggle('off', off);
+      fill(el, items.length ? items.map(([label, id]) => {
+        const b = h('button.eng-check', { type: 'button', class: on.has(id) || off ? 'on' : '', disabled: off, attrs: { role: 'checkbox', 'aria-checked': String(on.has(id) || off) } }, label);
+        b.addEventListener('click', () => {
+          const cur = new Set(f.get(key) || []);
+          if (cur.has(id)) cur.delete(id); else cur.add(id);
+          f.set(key, items.map(([, i]) => i).filter(i => cur.has(i)));
+          sync();
+        });
+        return b;
+      }) : h('span.dlg-note', 'None'));
+    };
+    return control(el, sync);
+  };
+
+  /** "All" with a checklist under it that only counts when All is off (folders, devices...). */
+  f.allOr = (allKey, listKey, items, label = 'All') => {
+    const list = f.checklist(listKey, items, { disabledBy: allKey });
+    const t = f.toggle(allKey);
+    t.addEventListener('click', () => f.refresh());
+    return h('div.eng-allor', h('div.eng-allor-h', t, h('span', label)), list);
+  };
+
+  /** Free-form tags: chips with ✕, and a box to add one (Enter). */
+  f.tags = (key, { placeholder = 'Add a tag' } = {}) => {
+    const chips = h('div.eng-tags');
+    const add = h('input.inp', { attrs: { placeholder, spellcheck: 'false' } });
+    const sync = () => fill(chips, (f.get(key) || []).map(t => h('span.eng-tag', t,
+      h('button', { type: 'button', title: `Remove ${t}`, onclick: () => { f.set(key, (f.get(key) || []).filter(x => x !== t)); sync(); } }, '✕'))));
+    add.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const v = add.value.trim();
+      if (v && !(f.get(key) || []).includes(v)) { f.set(key, [...(f.get(key) || []), v]); sync(); }
+      add.value = '';
+    });
+    return control(h('div.eng-tagbox', chips, add), sync);
   };
 
   f.text = (key, { placeholder, area = false } = {}) => {

@@ -2,7 +2,7 @@
 // Playback and Subtitles, plus this client's own extras. Changes save as you make them.
 import { h, fill } from '../h.js';
 import { CLIENT, VERSION } from '../api.js';
-import { deck, btn, toast, canEditPreferences } from '../ui.js';
+import { deck, btn, toast, canEditPreferences, squareJpeg } from '../ui.js';
 import { caps } from '../player/profile.js';
 import { subtitleCss } from '../player/engine-web.js';
 import { SUBTITLE_DEFAULTS } from '../settings.js';
@@ -105,21 +105,12 @@ export async function settings(ctx) {
         btn(tag ? 'Change picture' : 'Add picture', () => fileIn.click(), { color: 'sky', small: true }),
         tag ? btn('Remove', removeAvatar, { color: 'red', small: true, ghost: true }) : null));
   }
-  async function shrink(file) {
-    const bmp = await createImageBitmap(file);
-    const side = Math.min(bmp.width, bmp.height);
-    const c = document.createElement('canvas');
-    c.width = c.height = Math.min(512, side);
-    // Centre crop to a square.
-    c.getContext('2d').drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, c.width, c.height);
-    return c.toDataURL('image/jpeg', 0.88).split(',')[1];
-  }
   fileIn.addEventListener('change', async () => {
     const file = fileIn.files?.[0];
     fileIn.value = '';
     if (!file) return;
     try {
-      const data = await shrink(file);
+      const data = await squareJpeg(file);
       await api.req('POST', '/UserImage', { query: { userId: api.userId }, raw: { data, type: 'image/jpeg' } });
       await us.load();
       drawAvatar();

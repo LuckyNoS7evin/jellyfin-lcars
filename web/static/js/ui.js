@@ -339,3 +339,16 @@ export function whenVisible(el, fn) {
   io.observe(el);
   return () => io.disconnect();
 }
+
+/**
+ * A profile picture from an image file: centre-cropped to a square, at most 512 px, as base64
+ * JPEG (what Jellyfin's user image upload takes). Small enough for the proxy's body limit too.
+ */
+export async function squareJpeg(file) {
+  const bmp = await createImageBitmap(file);
+  const side = Math.min(bmp.width, bmp.height);
+  const c = document.createElement('canvas');
+  c.width = c.height = Math.min(512, side);
+  c.getContext('2d').drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.88).split(',')[1];
+}

@@ -94,7 +94,12 @@ export class Api {
     }
     if (!res.ok) {
       let msg = res.statusText || `HTTP ${res.status}`;
-      try { const t = await res.text(); if (t && t.length < 300) msg = t; } catch { /* ignore */ }
+      try {
+        let t = await res.text();
+        // Jellyfin often sends the reason as a JSON string ("..." with the quotes).
+        if (/^".*"$/s.test(t)) { try { t = JSON.parse(t); } catch { /* keep it as is */ } }
+        if (t && t.length < 300) msg = t;
+      } catch { /* ignore */ }
       throw new ApiError(res.status, msg);
     }
     if (res.status === 204) return null;

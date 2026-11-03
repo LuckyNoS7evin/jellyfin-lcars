@@ -9,6 +9,7 @@ import { confirmDialog } from '../menu.js';
 // stage is built (admin-plan.md); `load` imports the page module.
 export const SECTIONS = [
   { id: 'overview', label: 'Overview', n: 'E-01', color: 'orange', load: () => import('./overview.js').then(m => m.overview) },
+  { id: 'users', label: 'Users', n: 'E-02', color: 'sky', load: () => import('./users.js').then(m => m.users) },
 ];
 
 let cssLoaded = false;
