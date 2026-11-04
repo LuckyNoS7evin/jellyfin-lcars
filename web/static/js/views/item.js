@@ -6,7 +6,7 @@ import { Api, TICKS } from '../api.js';
 import * as f from '../fmt.js';
 import {
   deck, card, empty, errorBox, loading, btn, tag, ro, missingState, missingTag, itemHref, runtime, epCode, years, pickImage, image, code, toast,
-  canMarkPlayed, canRate,
+  canMarkPlayed, canRate, onUserData, swapKeepingFocus,
 } from '../ui.js';
 import { themeFor } from '../player/theme.js';
 import { menuButton, canManageCollections, download } from '../menu.js';
@@ -213,6 +213,8 @@ function toggles(ctx, it, { small = false } = {}) {
       fav.textContent = ud.IsFavorite ? 'Favourite ★' : 'Favourite ☆';
     } catch (e) { toast('Unable to comply', e.message, 'red'); }
   }, { color: 'salmon', ghost: true, small });
+  onUserData(it, played, () => { played.textContent = ud.Played ? 'Watched ✓' : 'Mark watched'; });
+  onUserData(it, fav, () => { fav.textContent = ud.IsFavorite ? 'Favourite ★' : 'Favourite ☆'; });
   return [canMarkPlayed(it) ? played : null, canRate(it) ? fav : null].filter(Boolean);
 }
 
@@ -445,31 +447,35 @@ function season(ctx, it) {
 }
 
 function episodes(ctx, list) {
+  return h('div.eps', list.map(ep => epRow(ctx, ep)));
+}
+
+function epRow(ctx, ep) {
   const { api, app } = ctx;
-  return h('div.eps', list.map(ep => {
-    const ud = ep.UserData || {};
-    const pct = !ud.Played && ud.PlayedPercentage > 0 ? ud.PlayedPercentage : 0;
-    const im = pickImage(ep, 'wide');
-    // Missing and unaired episodes (shown when "Show missing episodes" is on) can't play.
-    const miss = missingState(ep);
-    return h('div.ep', { class: [ud.Played ? 'played' : '', miss ? 'virtual' : ''].join(' '), key: ep.Id },
-      h('div.ep-img', miss ? {} : { onclick: () => app.play(ep, { resume: true }), title: 'Play' },
-        image(api, im, { shape: 'wide', label: epCode(ep) }),
-        pct ? h('div.prog', h('i', { style: { width: `${pct.toFixed(1)}%` } })) : null),
-      h('div.ep-body',
-        h('div.ep-t', h('span.n', epCode(ep) || (ep.IndexNumber ?? '')), h('a', { href: itemHref(ep) }, ep.Name)),
-        h('div.ep-m',
-          missingTag(ep),
-          ep.PremiereDate ? h('span', new Date(ep.PremiereDate).toLocaleDateString()) : null,
-          runtime(ep) ? h('span', runtime(ep)) : null,
-          ep.CommunityRating ? h('span', `★ ${ep.CommunityRating.toFixed(1)}`) : null,
-          ud.Played ? tag('Watched', 'sky') : pct ? tag(`${Math.round(pct)}%`, 'peach') : null),
-        ep.Overview ? h('p.overview.clamp', { onclick: e => e.currentTarget.classList.toggle('clamp') }, ep.Overview) : null),
-      h('div.ep-side',
-        miss ? null : btn(ud.PlaybackPositionTicks > 0 ? 'Resume' : 'Play', () => app.play(ep, { resume: true }), { small: true, color: 'orange' }),
-        toggles(ctx, ep, { small: true }),
-        menuButton(ctx, ep, { onChange: () => ctx.app.refresh() })));
-  }));
+  const ud = ep.UserData || {};
+  const pct = !ud.Played && ud.PlayedPercentage > 0 ? ud.PlayedPercentage : 0;
+  const im = pickImage(ep, 'wide');
+  // Missing and unaired episodes (shown when "Show missing episodes" is on) can't play.
+  const miss = missingState(ep);
+  const row = h('div.ep', { class: [ud.Played ? 'played' : '', miss ? 'virtual' : ''].join(' '), key: ep.Id },
+    h('div.ep-img', miss ? {} : { onclick: () => app.play(ep, { resume: true }), title: 'Play' },
+      image(api, im, { shape: 'wide', label: epCode(ep) }),
+      pct ? h('div.prog', h('i', { style: { width: `${pct.toFixed(1)}%` } })) : null),
+    h('div.ep-body',
+      h('div.ep-t', h('span.n', epCode(ep) || (ep.IndexNumber ?? '')), h('a', { href: itemHref(ep) }, ep.Name)),
+      h('div.ep-m',
+        missingTag(ep),
+        ep.PremiereDate ? h('span', new Date(ep.PremiereDate).toLocaleDateString()) : null,
+        runtime(ep) ? h('span', runtime(ep)) : null,
+        ep.CommunityRating ? h('span', `★ ${ep.CommunityRating.toFixed(1)}`) : null,
+        ud.Played ? tag('Watched', 'sky') : pct ? tag(`${Math.round(pct)}%`, 'peach') : null),
+      ep.Overview ? h('p.overview.clamp', { onclick: e => e.currentTarget.classList.toggle('clamp') }, ep.Overview) : null),
+    h('div.ep-side',
+      miss ? null : btn(ud.PlaybackPositionTicks > 0 ? 'Resume' : 'Play', () => app.play(ep, { resume: true }), { small: true, color: 'orange' }),
+      toggles(ctx, ep, { small: true }),
+      menuButton(ctx, ep, { onChange: () => ctx.app.refresh() })));
+  onUserData(ep, row, () => swapKeepingFocus(row, epRow(ctx, ep)));
+  return row;
 }
 
 // ---- music --------------------------------------------------------------------------------

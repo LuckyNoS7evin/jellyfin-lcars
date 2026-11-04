@@ -3,7 +3,7 @@
 import { h, fill } from './h.js';
 import { Api, connectSocket, store, TICKS, CLIENT } from './api.js';
 import * as f from './fmt.js';
-import { btn, arrow, colorAt, toast, canMarkPlayed, canRate, canRefreshMetadata, loading, errorBox, pickImage, image, setCardHooks, volumeBar } from './ui.js';
+import { btn, arrow, colorAt, toast, canMarkPlayed, canRate, canRefreshMetadata, loading, errorBox, pickImage, image, setCardHooks, volumeBar, applyUserData } from './ui.js';
 import { openItemMenu, addToPlaylist, addToCollection, canManageCollections, COLLECTABLE, refreshDialog, confirmDialog } from './menu.js';
 import { selectable, addSelectAction, clearSelection } from './select.js';
 import { startSound } from './sound.js';
@@ -884,6 +884,8 @@ app.listen = (type, fn) => {
   listeners.get(type).add(fn);
   return () => listeners.get(type)?.delete(fn);
 };
+// Watched, favourite and progress changed on another device (or by the server): redraw what shows it.
+app.listen('UserDataChanged', d => { if (!d?.UserId || d.UserId.replace(/-/g, '') === app.api.userId?.replace(/-/g, '')) applyUserData(d?.UserDataList); });
 // Watch together: it hears its socket messages through app.listen.
 app.sync = new SyncPlay(app);
 app.sync.on(() => drawHeader());

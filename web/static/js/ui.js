@@ -265,6 +265,8 @@ export function card(api, item, opts = {}) {
   el = h('div.card', { key: item.Id, style }, picBox, captions, details ? cardDetails(item) : null);
   // Multi-select (select.js, wired through the card hooks): libraries themselves aren't selectable.
   if (cardHooks?.selectable && item.Type !== 'CollectionFolder' && item.Type !== 'UserView') picBox.append(cardHooks.selectable(el, item));
+  const shown = el;
+  onUserData(item, el, () => swapKeepingFocus(shown, card(api, item, opts)));
   return el;
 }
 
@@ -320,6 +322,56 @@ function cardOverlay(api, item, opts, self) {
     onclick: e => { stop(e); cardHooks.menu(item, e.currentTarget, (it, info) => redraw(info)); },
   }, '⋯');
   return h('div.card-ov', play, h('div.card-ov-br', watched, fav, more));
+}
+
+// ---- live user data ----------------------------------------------------------------------------
+// Watched, favourite and progress changed elsewhere (another device, the player, the server
+// marking a season watched): the server sends UserDataChanged, and whatever on screen shows that
+// item redraws (official cardbuilder/itemsrefresher do the same). Things register with the
+// element that shows the item and how to redraw it; they're dropped once off the page.
+
+const USER_FIELDS = ['Played', 'IsFavorite', 'PlaybackPositionTicks', 'PlayedPercentage', 'UnplayedItemCount', 'PlayCount', 'LastPlayedDate', 'Likes'];
+const live = new Map(); // item id -> Set of { el, item, render, at }
+
+/** Redraw render() when this item's user data changes, while el is on the page. */
+export function onUserData(item, el, render) {
+  if (!item?.Id) return;
+  let set = live.get(item.Id);
+  if (!set) live.set(item.Id, set = new Set());
+  set.add({ el, item, render, at: Date.now() });
+}
+
+/** The server's UserDataChanged list: update and redraw what shows those items. */
+export function applyUserData(list = []) {
+  const now = Date.now();
+  const touched = new Set(); // items updated here: everything else showing them redraws too
+  for (const d of list) {
+    const id = String(d.ItemId || '').replace(/-/g, '');
+    const set = live.get(id);
+    if (!set) continue;
+    for (const b of [...set]) {
+      // Off the page (and not just built): forget it.
+      if (!b.el.isConnected) { if (now - b.at > 5000) set.delete(b); continue; }
+      const ud = b.item.UserData || (b.item.UserData = {});
+      if (!touched.has(b.item)) {
+        if (USER_FIELDS.every(k => ud[k] === d[k])) continue; // already showing this (our own change)
+        touched.add(b.item);
+      }
+      for (const k of USER_FIELDS) { if (d[k] === undefined) delete ud[k]; else ud[k] = d[k]; }
+      try { b.render(); } catch (e) { console.warn('user data redraw failed', e); }
+    }
+    if (!set.size) live.delete(id);
+  }
+}
+
+/** Replace an element with a new one, keeping focus on the same part of it (TV remotes). */
+export function swapKeepingFocus(old, fresh) {
+  const a = document.activeElement;
+  const cls = a && old.contains(a) ? (a === old ? '' : a.classList[0]) : null;
+  old.replaceWith(fresh);
+  if (cls == null) return;
+  const t = cls ? fresh.querySelector(`.${CSS.escape(cls)}`) : fresh;
+  t?.focus({ preventScroll: true });
 }
 
 // ---- toasts ---------------------------------------------------------------------------------
