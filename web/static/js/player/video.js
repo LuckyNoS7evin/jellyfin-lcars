@@ -718,7 +718,9 @@ export function playVideo(app, item, opts = {}) {
     if (list) { nextEp = list[listIndex + 1] || null; drawButtons(); return; }
     if (cur.Type !== 'Episode' || !cur.SeriesId) return;
     try {
-      const r = await api.get(`/Shows/${cur.SeriesId}/Episodes`, { userId: api.userId, startItemId: cur.Id, limit: 2, fields: 'Overview' });
+      // Episodes with a file only, as official (playbackmanager.js getEpisodes): with "show
+      // missing episodes" on, the server lists the missing and unaired ones too.
+      const r = await api.get(`/Shows/${cur.SeriesId}/Episodes`, { userId: api.userId, startItemId: cur.Id, isMissing: false, limit: 2, fields: 'Overview' });
       nextEp = r.Items?.[1] || null;
     } catch { /* no next */ }
     drawButtons();
@@ -804,7 +806,20 @@ export function playVideo(app, item, opts = {}) {
   eng.on('volumechange', () => { volBar.draw(); reporter?.progress('VolumeChange'); });
   eng.on('ratechange', drawTime);
   eng.on('pipchange', () => { if (menuEl?.dataset.kind === 'options') menu('options', true); });
-  eng.on('ended', () => { if (nextEp && (list || pb.autoplayNext)) playNext(); else close(); });
+  function ended() { if (nextEp && (list || pb.autoplayNext)) playNext(); else close(); }
+  eng.on('ended', ended);
+  // Some files end early on one track: the video and one audio track stop a minute before
+  // the file's runtime because another audio track (a dub) runs longer. The browser or hls.js
+  // then waits at "Buffering" for data that never comes, and 'ended' never fires. So near the
+  // end, if playback hasn't moved and nothing new has buffered for 10 seconds, treat it as ended.
+  let stall = { p: -1, b: -1, since: 0 };
+  function checkStall() {
+    if (eng.kind === 'native' || !started || eng.paused || !askEl.hidden) { stall.since = 0; return; }
+    const p = position(), d = dur(), b = eng.bufferedTo(p);
+    if (!d || d - p > 120 || b - p > 1 || p !== stall.p || b !== stall.b) { stall = { p, b, since: Date.now() }; return; }
+    if (!stall.since) { stall.since = Date.now(); return; }
+    if (Date.now() - stall.since >= 10000) { stall = { p: -1, b: -1, since: 0 }; ended(); }
+  }
   // 'playing' doesn't always follow a stall (hls.js, seeks), so clear the buffering note
   // once the picture is moving again.
   let lastT = -1;
@@ -910,7 +925,7 @@ export function playVideo(app, item, opts = {}) {
     navigator.mediaSession.metadata = new MediaMetadata({ title: cur.Name, artist: cur.SeriesName || '', artwork: art ? [{ src: art, sizes: '341x512' }] : [] });
   }
 
-  const tick = setInterval(() => { if (!closed) drawTime(); }, 500);
+  const tick = setInterval(() => { if (!closed) { drawTime(); checkStall(); } }, 500);
 
   document.body.append(root);
   // In the iPhone app this hides its tab bar and turns the phone to landscape (its own player,
