@@ -4,7 +4,7 @@
 import { h, fill } from '../h.js';
 import { TICKS } from '../api.js';
 import * as f from '../fmt.js';
-import { deck, btn, tag, seg, empty, toast, errorBox, loading, epCode, colorAt } from '../ui.js';
+import { deck, btn, tag, seg, empty, toast, errorBox, loading, epCode, colorAt, image, pickImage } from '../ui.js';
 import { confirmDialog } from '../menu.js';
 import { REASONS } from './overview.js';
 import { row } from './form.js';
@@ -142,7 +142,9 @@ async function transcodes(ctx) {
     const v = stream(s, 'Video'), a = stream(s, 'Audio');
     const reasons = (ti.TranscodeReasons || []).map(r => REASONS[r] || r);
     const hw = ti.HardwareAccelerationType && ti.HardwareAccelerationType !== 'none' ? ti.HardwareAccelerationType : 'software';
+    const shape = np.MediaType === 'Audio' ? 'square' : 'poster';
     return h('div.eng-sess',
+      h('div.eng-sess-img', image(api, pickImage(np, shape), { shape })),
       h('div.eng-sess-b',
         h('div.eng-sess-who', h('b', s.UserName || 'No user'), h('span', `${s.DeviceName} · ${s.Client}`)),
         h('a.eng-sess-t', { href: `#/item/${np.Id}` }, label(np)),
