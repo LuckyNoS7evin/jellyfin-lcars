@@ -304,10 +304,11 @@
 .diag-tc { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 14px; margin: 6px 0; font-size: 16px; text-transform: none; }
 .diag-tc .l { color: var(--lilac); text-transform: uppercase; font-size: 14px; letter-spacing: .05em; }
 .diag-tc > span:not(.l) { color: var(--peach); }
-.diag-users { display: grid; gap: 10px; }
-.diag-user { display: grid; grid-template-columns: 12ch minmax(0, 1fr); gap: 2px 14px; align-items: center; }
-.diag-user b { color: var(--peach); grid-row: span 2; }
-.diag-user > span { color: var(--lilac); font-size: 14px; text-transform: none; }
+/* One grid for every user, so the name column fits the longest name and the bars line up. */
+.diag-users { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 14px; align-items: center; }
+.diag-user { display: contents; }
+.diag-user b { color: var(--peach); grid-row: span 2; max-width: 28ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.diag-user > span { color: var(--lilac); font-size: 14px; text-transform: none; margin-bottom: 8px; }
 .diag-days { display: flex; align-items: flex-end; gap: 2px; height: 140px; padding: 4px 0; border-bottom: 2px solid var(--dim); }
 .diag-day { flex: 1; height: 100%; display: flex; align-items: flex-end; }
 .diag-day i { display: block; width: 100%; min-height: 2px; background: var(--orange); border-radius: 3px 3px 0 0; }

@@ -229,7 +229,7 @@ async function viewing(ctx) {
     const most = ranked[0][1].secs || 1;
     const userDeck = deck('By user', { color: 'sky', num: 1, code: `${per.size}` },
       h('div.diag-users', ranked.map(([id, u], i) => h('div.diag-user',
-        h('b', name(id)),
+        h('b', { title: name(id) }, name(id)),
         seg(u.secs / most, { n: 30, tone: colorAt(i) }),
         h('span', `${f.num(u.plays)} plays${u.audio ? ` (${f.num(u.audio)} music)` : ''} · ${f.dur(Math.round(u.secs))} · last ${f.ago(new Date(u.last).toISOString())}`)))));
 
@@ -326,7 +326,7 @@ function transcodeDecks(list, days) {
   const devices = count(r => `${r.Device} · ${r.Client}`);
   const enc = count(r => (r.Hardware && r.Hardware !== 'none' ? r.Hardware : 'software'));
   const bars = (rows, tone) => { const top = rows[0]?.[1] || 1; return h('div.diag-users', rows.slice(0, 8).map(([k, n], i) =>
-    h('div.diag-user', h('b', k), seg(n / top, { n: 24, tone: tone || colorAt(i) }), h('span', `${n} ${n === 1 ? 'time' : 'times'}`)))); };
+    h('div.diag-user', h('b', { title: k }, k), seg(n / top, { n: 24, tone: tone || colorAt(i) }), h('span', `${n} ${n === 1 ? 'time' : 'times'}`)))); };
   return [
     deck('Transcodes', { color: 'salmon', num: 1, code: `${list.length}` },
       h('div.eng-tiles',
