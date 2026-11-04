@@ -26,6 +26,8 @@ import { tvSetup } from './tv.js';
 import { remote as remoteView } from './views/remote.js';
 import { quickConnect } from './views/quickconnect.js';
 import { Remote } from './remote.js';
+import { SyncPlay } from './syncplay.js';
+import { together as togetherView } from './views/together.js';
 
 // The desktop app draws mpv's picture behind the page, so there the page itself stays
 // see-through and the black is #app's (css/jf.css, engine-mpv.js).
@@ -57,6 +59,7 @@ const ROUTES = [
   [/^\/queue$/, queueView],
   [/^\/settings$/, settings],
   [/^\/remote$/, remoteView],
+  [/^\/together$/, togetherView],
   [/^\/quickconnect$/, quickConnect],
   // The admin dashboard, loaded on first use (js/admin/).
   [/^\/admin(?:\/(.*))?$/, adminRoute, ['sub']],
@@ -172,6 +175,11 @@ const app = {
       return;
     }
     if (it.Type === 'Book') { this.read(it, opts); return; }
+    // In a watch-together group a new video is the group's: ask it, and it starts everyone.
+    if (this.sync?.active && !opts.fromSync && !this.remote.active) {
+      this.sync.requestPlay(it, opts).catch(e => toast('Unable to comply', e.message, 'red'));
+      return;
+    }
     if (this.remote.active) {
       // Play on another device: send it the same list, start point and tracks.
       const list = opts.list?.length ? opts.list : [it];
@@ -184,8 +192,8 @@ const app = {
     }
     this.queue.pause();
     stopTheme();
-    this.player?.close();
-    this.player = playVideo(this, it, opts);
+    this.player?.close({ replaced: true });
+    this.player = playVideo(this, it, opts.fromSync ? { ...opts, sync: this.sync } : opts);
     drawHeader();
   },
 
@@ -209,6 +217,7 @@ const app = {
   async logout() {
     stopTheme();
     this.remote.disconnect();
+    if (this.sync?.active) { await this.api.post('/SyncPlay/Leave').catch(() => {}); this.sync.disable(false); }
     this.socket?.close();
     this.player?.close();
     this.queue.stop();
@@ -357,6 +366,8 @@ const clockEl = h('div.hdr-clock');
 // Play on sits at the end of the header bar, under the stardate, as a block between the last
 // segment and a rounded cap (like the code block on a deck header).
 const playOnEl = h('a.fr.bar-btn', { href: '#/remote' });
+// Watch together (SyncPlay) sits just before it: the group's name while in one.
+const togetherEl = h('a.fr.bar-btn.together', { href: '#/together' });
 const railEl = h('nav.rail-slot', { attrs: { 'aria-label': 'Navigation' } });
 const mainEl = h('main.decks', { attrs: { tabindex: -1 } });
 const backdropEl = h('div.backdrop', { attrs: { 'aria-hidden': 'true' } });
@@ -366,7 +377,7 @@ frameEl.append(
   h('header.hdr',
     h('div.elbow.fr.e-hdr', h('span.elbow-label', 'LCARS'), h('span.elbow-code', '47-1701')),
     h('div.hdr-slot', h('div.hdr-content', statusEl, h('div.hdr-title', titleEl, clockEl))),
-    h('div.bar.hbar', h('span.fr.b1'), h('span.fr.b2'), h('span.fr.b3'), h('span.fr.b4'), h('span.fr.b5'), playOnEl, h('span.fr.bar-cap'))),
+    h('div.bar.hbar', h('span.fr.b1'), h('span.fr.b2'), h('span.fr.b3'), h('span.fr.b4'), h('span.fr.b5'), togetherEl, playOnEl, h('span.fr.bar-cap'))),
   h('div.frame',
     h('div.elbow.fr.e-top', h('span.elbow-code', 'MEDIA')),
     h('div.bar.tbar', h('span.fr.b2'), h('span.fr.b1'), h('span.fr.b4'), h('span.fr.b3')),
@@ -410,6 +421,13 @@ function drawHeader() {
   playOnEl.title = on ? `Playing on ${app.remote.name}` : 'Play on another device';
   if (s) playOnEl.setAttribute('href', '#/remote'); else playOnEl.removeAttribute('href');
   fill(playOnEl, s ? (on ? `On ${app.remote.name}` : 'Play on') : null);
+  const g = app.sync?.group;
+  const canSync = !!s && !!app.sync && (!!g || app.sync.access !== 'None');
+  togetherEl.hidden = !canSync;
+  togetherEl.classList.toggle('casting', !!g);
+  togetherEl.classList.toggle('here', currentPath() === '/together');
+  togetherEl.title = g ? `Watching together: ${g.GroupName}` : 'Watch together';
+  fill(togetherEl, canSync ? (g ? `Together · ${g.GroupName}` : 'Together') : null);
 }
 
 const LINK = { live: ['live', 'Link active'], connecting: ['wait', 'Establishing'], offline: ['lost', 'Link lost'] };
@@ -841,6 +859,9 @@ app.listen = (type, fn) => {
   listeners.get(type).add(fn);
   return () => listeners.get(type)?.delete(fn);
 };
+// Watch together: it hears its socket messages through app.listen.
+app.sync = new SyncPlay(app);
+app.sync.on(() => drawHeader());
 
 async function onSocket(m) {
   const sub = subs.get(m.MessageType);

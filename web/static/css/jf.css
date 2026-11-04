@@ -735,6 +735,9 @@ a.np-title:hover, a.np-title:focus-visible { text-decoration: underline; outline
 .bar-btn.here { --c: var(--peach); }
 .bar-btn.casting { --c: var(--lilac); }
 .bar-btn.off { pointer-events: none; padding: 0; width: calc(var(--bar) * 2); }
+.bar > .bar-btn.together { --c: var(--sky); margin-right: 4px; }
+.bar > .bar-btn.together.casting { --c: var(--peach); }
+.bar > .bar-btn.together[hidden] { display: none; }
 @media (max-width: 720px) {
   .dev { grid-template-columns: minmax(0, 1fr); }
   .dev-b { justify-content: flex-start; }
@@ -746,3 +749,5 @@ a.np-title:hover, a.np-title:focus-visible { text-decoration: underline; outline
 .wiz-steps .tab.done { color: var(--dim); }
 .login-disclaimer { margin: 14px 0 0; color: var(--lilac); font-size: 15px; text-transform: none; white-space: pre-line; max-width: 70ch; }
 .pin-file { font-family: ui-monospace, monospace; font-size: 14px; color: var(--peach); word-break: break-all; margin: 4px 0 10px; text-transform: none; }
+/* Watch together: who is in the group */
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }

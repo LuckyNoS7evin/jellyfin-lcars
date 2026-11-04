@@ -80,6 +80,11 @@ export function playVideo(app, item, opts = {}) {
   let method = 'DirectPlay';
   let reporter = null;
   let audioIndex = opts.audioIndex;
+  // Watch together (syncplay.js): the controls ask the group instead of acting, and the group's
+  // commands drive the player through ctl.local.
+  let sync = opts.sync || null;
+  let syncLoaded = false;   // this item has loaded and paused at its start for the group
+  let onSeeked = null;      // resolves ctl.local.whenReady() after a group seek
   let subIndex = opts.subIndex;
   let maxBitrate = pb.maxBitrate || 0;
   const skipBack = pb.skipBack;
@@ -122,7 +127,8 @@ export function playVideo(app, item, opts = {}) {
 
   function drawInfo() {
     const vs = ms?.MediaStreams?.find(s => s.Type === 'Video');
-    fill(infoEl, 
+    fill(infoEl,
+      sync ? tag('Together', 'peach') : null,
       tag(method === 'DirectPlay' ? 'Direct' : 'Transcode', method === 'DirectPlay' ? 'sky' : 'salmon'),
       vs ? tag(`${vs.Codec || ''} ${vs.Height ? vs.Height + 'p' : ''}`.trim(), 'lilac') : null,
       ms?.Container ? tag(ms.Container, 'blue') : null,
@@ -348,6 +354,7 @@ export function playVideo(app, item, opts = {}) {
     drawMarks();
     loadSegments(token);
 
+    syncLoaded = false;
     reporter = new Reporter(api, { itemId: cur.Id, mediaSourceId: ms.Id, playSessionId, playMethod: method, audioIndex, subIndex }, state);
     started = false;
     // Tell the server what's loaded even if it hasn't started: a remote Play into a background
@@ -366,6 +373,7 @@ export function playVideo(app, item, opts = {}) {
       }
       setStatus('Press play');
       drawButtons();
+      if (sync && !syncLoaded) { syncLoaded = true; sync.loaded(); }
       clearTimeout(early);
       if (!started && token === loadToken && !closed) { started = true; reporter?.start(); }
     }
@@ -689,6 +697,8 @@ export function playVideo(app, item, opts = {}) {
    * Both just become entries in the video queue.
    */
   async function expandFirst(startTicks) {
+    // In a group everyone plays the group's queue as it is.
+    if (sync) return;
     const [intros, parts] = await Promise.all([
       pb.cinemaMode && !startTicks && item.Type === 'Movie'
         ? api.get(`/Items/${item.Id}/Intros`, { userId: api.userId }).then(r => r.Items || []).catch(() => []) : [],
@@ -704,11 +714,15 @@ export function playVideo(app, item, opts = {}) {
 
   // ---- controls ---------------------------------------------------------------------------
 
-  function toggle() { if (eng.paused) eng.play().catch(() => {}); else eng.pause(); }
+  function toggle() {
+    if (sync) { if (eng.paused) sync.requestUnpause(); else sync.requestPause(); return; }
+    if (eng.paused) eng.play().catch(() => {}); else eng.pause();
+  }
+  const clampTime = s => { const d = dur(); return Math.max(0, d ? Math.min(d - 1, s) : s); };
+  function rawSeek(s) { eng.seek(clampTime(s)); drawTime(); }
   function seekTo(s) {
-    const d = dur();
-    eng.seek(Math.max(0, d ? Math.min(d - 1, s) : s));
-    drawTime();
+    if (sync) { sync.requestSeek(clampTime(s)); return; }
+    rawSeek(s);
   }
   function seekBy(ds) { seekTo(position() + ds); }
   // The desktop app's mpv fills the app's window, so fullscreen is the window's (engine-mpv.js).
@@ -733,12 +747,14 @@ export function playVideo(app, item, opts = {}) {
   }
 
   async function playNext() {
+    if (sync) { sync.requestNext(); return; }
     if (!nextEp) return;
     if (list) listIndex++;
     go(nextEp);
   }
 
   function playPrev() {
+    if (sync) { sync.requestPrevious(); return; }
     if (!list || listIndex === 0) { seekTo(0); return; }
     listIndex--;
     go(list[listIndex]);
@@ -747,7 +763,7 @@ export function playVideo(app, item, opts = {}) {
   async function go(next) {
     if (!askEl.hidden) return; // already asking "Are you still watching?"
     if (reporter) { await reporter.stop(); reporter = null; }
-    if (!(await stillWatching(next))) { close(); return; }
+    if (!sync && !(await stillWatching(next))) { close(); return; }
     if (closed) return;
     cur = next;
     burnAll = false;
@@ -764,9 +780,12 @@ export function playVideo(app, item, opts = {}) {
     load(0);
   }
 
-  async function close() {
+  // replaced: another player takes over, or the group itself finished or stopped; otherwise
+  // closing in a group stops following it, so the others don't wait for this device.
+  async function close({ replaced = false } = {}) {
     if (closed) return;
     closed = true;
+    if (sync && !replaced) sync.halt();
     loadToken++;
     closeMenu();
     clearInterval(statsTimer);
@@ -801,18 +820,26 @@ export function playVideo(app, item, opts = {}) {
   eng.on('click', () => { if (menuEl) closeMenu(); else toggle(); });
   eng.on('dblclick', fullscreen);
   eng.on('playing', () => {
+    if (sync) {
+      // In a group the item starts paused at its place, and the group starts it together.
+      if (!syncLoaded) { syncLoaded = true; eng.pause(); sync.loaded(); } else sync.playing();
+    }
     setStatus('');
     if (!started) { started = true; reporter?.start(); } else reporter?.progress('Unpause');
     drawButtons();
     poke();
   });
   eng.on('pause', () => { reporter?.progress('Pause'); drawButtons(); poke(); });
-  eng.on('waiting', () => setStatus('Buffering', true));
-  eng.on('seeked', () => reporter?.progress('TimeUpdate'));
+  eng.on('waiting', () => { setStatus('Buffering', true); sync?.waiting(); });
+  eng.on('seeked', () => { reporter?.progress('TimeUpdate'); const f = onSeeked; onSeeked = null; f?.(); });
   eng.on('volumechange', () => { volBar.draw(); reporter?.progress('VolumeChange'); });
   eng.on('ratechange', drawTime);
   eng.on('pipchange', () => { if (menuEl?.dataset.kind === 'options') menu('options', true); });
-  function ended() { if (nextEp && (list || pb.autoplayNext)) playNext(); else close(); }
+  function ended() {
+    // The end of the group's queue: done together, still in the group.
+    if (sync) { if (nextEp) sync.requestNext(); else close({ replaced: true }); return; }
+    if (nextEp && (list || pb.autoplayNext)) playNext(); else close();
+  }
   eng.on('ended', ended);
   // Some files end early on one track: the video and one audio track stop a minute before
   // the file's runtime because another audio track (a dub) runs longer. The browser or hls.js
@@ -972,6 +999,31 @@ export function playVideo(app, item, opts = {}) {
     setMuted: m => { eng.muted = m; showVolume(); },
     toggleMute: () => { toggleMute(); showVolume(); },
     fullscreen,
+    // Watch together: the group's commands act here directly (syncplay.js).
+    local: {
+      // As at load: if the browser won't start it with sound (no click on the page yet), start
+      // it muted rather than leave this device behind the group.
+      play: () => eng.play().catch(e => {
+        if (e?.name !== 'NotAllowedError' || eng.muted || closed) return;
+        eng.muted = true;
+        eng.play().then(() => { autoMuted = true; osd('Muted', 'Click or press a key for sound'); }).catch(() => { eng.muted = false; });
+      }),
+      pause: () => eng.pause(),
+      seek: s => rawSeek(s),
+      position: () => position(),
+      paused: () => eng.paused,
+      stop: () => close({ replaced: true }),
+      whenReady: () => new Promise(res => { const t = setTimeout(res, 5000); onSeeked = () => { clearTimeout(t); res(); }; }),
+    },
+    /** The group moved to items[index] (next, previous, or a pick from its queue). */
+    syncGoTo(items, index) { list = items; listIndex = index; go(list[listIndex]); },
+    /** The group's queue changed around the item playing. */
+    syncQueue(items) {
+      const i = items.findIndex(x => x.PlaylistItemId === cur.PlaylistItemId);
+      list = items; if (i >= 0) listIndex = i;
+      findNext();
+    },
+    syncOff() { sync = null; drawInfo(); drawButtons(); },
   };
   return ctl;
 }
