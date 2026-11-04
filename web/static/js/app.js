@@ -27,11 +27,14 @@ import { remote as remoteView } from './views/remote.js';
 import { quickConnect } from './views/quickconnect.js';
 import { Remote } from './remote.js';
 import { SyncPlay } from './syncplay.js';
+import { useLcarsPicker } from './picker.js';
 import { together as togetherView } from './views/together.js';
 
 // The desktop app draws mpv's picture behind the page, so there the page itself stays
 // see-through and the black is #app's (css/jf.css, engine-mpv.js).
 if (desktopApp()) document.documentElement.classList.add('desktop-app');
+// Dropdown lists: the desktop app shows none for LCARS, and webOS's don't work (picker.js).
+if (desktopApp() || /Web0S|webOS/i.test(navigator.userAgent)) useLcarsPicker();
 
 // Assets live in .../static/<version>/ wherever LCARS is served from: /static/ by its own server,
 // /web/static/ (under any base URL) when Jellyfin hosts it as its web client.

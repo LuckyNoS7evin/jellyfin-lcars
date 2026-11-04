@@ -774,4 +774,14 @@ a.np-title:hover, a.np-title:focus-visible { text-decoration: underline; outline
   .opts-open .lib-play:not([hidden]) { flex: 0 0 100%; display: flex; gap: 6px; }
   .opts-open .lib-sum .tab:first-child { background: var(--sc, var(--sky)); color: #000; }
 }
+/* LCARS's own dropdown list (picker.js), where the browser's doesn't open. */
+.picker { position: fixed; z-index: 400; display: grid; gap: 2px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+  background: #000; border-left: 10px solid var(--sc, var(--peach)); border-radius: 0 18px 18px 0; padding: 6px 8px 6px 6px;
+  box-shadow: 0 6px 30px rgb(0 0 0 / .7); max-width: min(92vw, 520px); }
+.picker-o { all: unset; box-sizing: border-box; display: block; padding: 6px 12px; border-radius: 0 14px 14px 0; cursor: pointer;
+  color: var(--peach); font-size: 17px; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.picker-o:hover, .picker-o:focus-visible { background: var(--peach); color: #000; }
+.picker-o.on { color: var(--orange); }
+.picker-o.on::before { content: "▸ "; }
+.picker-o[disabled] { opacity: .4; cursor: default; }
 
