@@ -4,6 +4,7 @@
 import { TICKS, randomId } from '../api.js';
 import { caps } from './profile.js';
 import { Reporter } from './report.js';
+import { autoBitrate } from './bitrate.js';
 
 const rid = randomId;
 const isAudio = i => i.Type === 'Audio' || i.MediaType === 'Audio';
@@ -180,9 +181,12 @@ export class AudioQueue {
     const playSessionId = rid();
     // A music quality limit makes the server send mp3 at that bitrate when a file is above it.
     const limit = this.app.us?.maxMusicBitrate || 0;
+    // Otherwise, away from home, under what the connection test found (as official; none at home).
+    const auto = limit ? 0 : await autoBitrate(this.api).catch(() => 0);
+    if (this.current !== it) return; // stopped or moved on meanwhile
     this.el.src = this.api.url(`/Audio/${it.Id}/universal`, {
       UserId: this.api.userId, DeviceId: this.api.deviceId, PlaySessionId: playSessionId,
-      MaxStreamingBitrate: limit || 140_000_000, AudioBitRate: limit || undefined, Container: containers.join(','),
+      MaxStreamingBitrate: limit || auto || 140_000_000, AudioBitRate: limit || undefined, Container: containers.join(','),
       TranscodingContainer: 'mp3', TranscodingProtocol: 'http', AudioCodec: 'mp3', EnableRedirection: true, EnableRemoteMedia: false,
     }, { auth: true });
     this.started = false;

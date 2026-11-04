@@ -8,6 +8,7 @@ import { Api, TICKS } from '../api.js';
 import * as f from '../fmt.js';
 import { btn, arrow, tag, toast, epCode, image, pickImage, seg, volumeBar } from '../ui.js';
 import { Reporter, playbackInfo } from './report.js';
+import { autoBitrate, lastMeasured } from './bitrate.js';
 import { createEngine } from './engine.js';
 import { native } from '../shell.js';
 
@@ -309,10 +310,13 @@ export function playVideo(app, item, opts = {}) {
     eng.stop();
     let info;
     const fullP = full?.Id === cur.Id ? Promise.resolve(full) : api.item(cur.Id).catch(() => cur);
+    // Auto: the limit the connection test found (none at home).
+    const cap = maxBitrate || await autoBitrate(api).catch(() => 0) || undefined;
+    if (token !== loadToken || closed) return;
     try {
       [info, full] = await Promise.all([playbackInfo(api, cur.Id, {
-        profile: eng.profile({ maxBitrate: maxBitrate || undefined, burnIn: burnAll }),
-        maxBitrate: maxBitrate || undefined,
+        profile: eng.profile({ maxBitrate: cap, burnIn: burnAll }),
+        maxBitrate: cap,
         // The version picked on the title page (for that item, not its intros), then the same one on reloads.
         mediaSourceId: ms?.Id || (cur.Id === item.Id ? wantSource : undefined),
         audioIndex, subIndex,
@@ -592,6 +596,11 @@ export function playVideo(app, item, opts = {}) {
   // (from this device's session), and what the engine sees.
 
   const mbps = b => (b ? `${(b / 1e6).toFixed(b >= 1e7 ? 0 : 1)} Mbps` : null);
+  const autoNote = () => {
+    const m = lastMeasured();
+    if (!m) return 'Auto';
+    return m.home ? 'Auto · none on the home network' : m.bps ? `Auto · ${mbps(m.bps)} (connection test)` : 'Auto · none (test failed)';
+  };
   const fps = n => (n ? `${Math.round(n * 100) / 100} fps` : null);
 
   function toggleStats() {
@@ -637,6 +646,7 @@ export function playVideo(app, item, opts = {}) {
         ['Dropped frames', st.frames ? `${st.dropped} of ${st.frames}` : null],
         ['Buffered', st.buffered != null ? `${st.buffered.toFixed(1)} s` : null],
         ['Bandwidth', mbps(st.bandwidth)],
+        ['Bitrate limit', maxBitrate ? mbps(maxBitrate) : autoNote()],
       ]),
       ti ? section('Transcoding', [
         ['Video', ti.IsVideoDirect ? 'Copied' : [ti.VideoCodec, ti.Width && `${ti.Width}×${ti.Height}`].filter(Boolean).join(' · ')],

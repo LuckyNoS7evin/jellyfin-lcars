@@ -4,11 +4,12 @@ import { h, fill } from '../h.js';
 import { CLIENT, VERSION } from '../api.js';
 import { deck, btn, toast, canEditPreferences, squareJpeg } from '../ui.js';
 import { caps } from '../player/profile.js';
+import { autoBitrate, lastMeasured } from '../player/bitrate.js';
 import { subtitleCss } from '../player/engine-web.js';
 import { SUBTITLE_DEFAULTS, UserSettings } from '../settings.js';
 import { libraryTabs } from './library.js';
 
-const BITRATES = [['Auto (no limit)', 0], ['120 Mbps', 120e6], ['60 Mbps', 60e6], ['40 Mbps', 40e6], ['20 Mbps', 20e6], ['10 Mbps', 10e6], ['8 Mbps', 8e6], ['4 Mbps', 4e6], ['2 Mbps', 2e6], ['1 Mbps', 1e6]];
+const BITRATES = [['Auto', 0], ['120 Mbps', 120e6], ['60 Mbps', 60e6], ['40 Mbps', 40e6], ['20 Mbps', 20e6], ['10 Mbps', 10e6], ['8 Mbps', 8e6], ['4 Mbps', 4e6], ['2 Mbps', 2e6], ['1 Mbps', 1e6]];
 const MUSIC_BITRATES = [['As the files are', 0], ['320 kbps', 320e3], ['256 kbps', 256e3], ['192 kbps', 192e3], ['128 kbps', 128e3], ['96 kbps', 96e3], ['64 kbps', 64e3]];
 const SKIPS = [5, 10, 15, 20, 30, 45, 60, 90, 120].map(s => [`${s} seconds`, s * 1000]);
 const NEXTUP_DAYS = [['No limit', 0], ['30 days', 30], ['60 days', 60], ['90 days', 90], ['180 days', 180], ['365 days', 365], ['2 years', 730]];
@@ -76,6 +77,18 @@ export async function settings(ctx) {
       onchange(on);
     });
     return b;
+  };
+  // Runs the test Auto uses and shows what it found.
+  const speedTest = () => {
+    const out = h('span.set-v');
+    const show = m => { out.textContent = !m ? 'Not tested yet' : m.home ? 'Home network: no limit' : m.bps ? `${(m.bps / 1e6).toFixed(1)} Mbps` : 'Test failed: no limit'; };
+    show(lastMeasured());
+    const b = btn('Test now', async () => {
+      b.disabled = true; out.textContent = 'Testing…';
+      await autoBitrate(api, { force: true }).catch(() => 0);
+      show(lastMeasured()); b.disabled = false;
+    }, { small: true, color: 'sky' });
+    return h('div.set-test', out, b);
   };
   const select = (options, value, onchange) => h('select.sel', { onchange: e => onchange(e.target.value) },
     options.map(([t, v]) => h('option', { value: String(v), attrs: { selected: String(v) === String(value) } }, t)));
@@ -242,7 +255,9 @@ export async function settings(ctx) {
       cfgRow('Play next episode automatically', toggle(cfg.EnableNextEpisodeAutoPlay, on => saveCfg({ EnableNextEpisodeAutoPlay: on }))),
       row('Skip back', select(SKIPS, us.num('skipBackLength', 10000), v => savePref('skipBackLength', v))),
       row('Skip forward', select(SKIPS, us.num('skipForwardLength', 30000), v => savePref('skipForwardLength', v))),
-      localRow('Maximum streaming bitrate', select(BITRATES, us.maxBitrate, v => { us.setLocal('maxBitrate', Number(v)); saved(); }), 'Above this, Jellyfin transcodes (this device)'),
+      localRow('Maximum streaming bitrate', select(BITRATES, us.maxBitrate, v => { us.setLocal('maxBitrate', Number(v)); saved(); }),
+        'Above this, Jellyfin transcodes. Auto: no limit at home, and away from home under what a connection test finds (this device)'),
+      localRow('Connection test', speedTest(), 'What Auto stays under; tested when you play, at most once an hour'),
       localRow('Music quality', select(MUSIC_BITRATES, us.maxMusicBitrate, v => { us.setLocal('maxMusicBitrate', Number(v)); saved(); }), 'Songs above this are sent as mp3 at it, for mobile data (this device)'),
       localRow('Maximum resolution', select(RESOLUTIONS, us.local('maxVideoWidth', 0), v => { us.setLocal('maxVideoWidth', Number(v)); saved(); }), 'Transcodes are scaled down to this (this device)'),
       localRow('Limit direct play to that resolution', toggle(us.local('limitSupportedVideoResolution', false), on => { us.setLocal('limitSupportedVideoResolution', on); saved(); }),
