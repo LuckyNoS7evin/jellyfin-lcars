@@ -211,6 +211,15 @@
 .player { position: fixed; inset: 0; z-index: 100; background: #000; display: flex; }
 .player .p-vid { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
 .player video { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
+/* The desktop app's mpv draws behind the web page (engine-mpv.js): while it plays, the page is
+   see-through down to the window and only the player's controls are drawn. */
+/* In the app the page's own background is never opaque, only #app's: once Chromium has drawn the
+   page opaque, parts that later turn see-through keep their old pixels over the video. */
+html.desktop-app, html.desktop-app body { background: transparent !important; }
+html.desktop-app #app { background: #000; min-height: 100vh; }
+html.mpv-playing .player, html.mpv-playing .player .p-vid { background: transparent !important; }
+html.mpv-playing #app { visibility: hidden; }
+.player .p-mpv { position: absolute; inset: 0; }
 .player .libassjs-canvas-parent { position: absolute !important; inset: 0; pointer-events: none; }
 /* The cue look comes from the subtitle settings (engine-web.js setCueStyle). */
 .player video[data-aspect="cover"] { object-fit: cover; }

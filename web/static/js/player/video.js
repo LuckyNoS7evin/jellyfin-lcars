@@ -210,7 +210,7 @@ export function playVideo(app, item, opts = {}) {
       nextEp ? btn('Next', playNext, { color: 'blue', title: nextEp.Name }) : null,
       // The volume meter sits inside the lilac bar.
       h('span.grow', volBar),
-      btn(document.fullscreenElement ? 'Window' : 'Full screen', fullscreen, { color: 'salmon' }),
+      btn(isFullscreen() ? 'Window' : 'Full screen', fullscreen, { color: 'salmon' }),
       h('span.grow.r'));
   }
 
@@ -340,7 +340,7 @@ export function playVideo(app, item, opts = {}) {
       url = api.url(ms.TranscodingUrl.replace(/^\/+/, '/'));
       if (!/[?&](api_key|ApiKey)=/i.test(url)) url += `&ApiKey=${encodeURIComponent(api.token)}`;
     }
-    await eng.load({ url, hls: !direct, direct, startAt, ms, subs });
+    await eng.load({ url, hls: !direct, direct, startAt, ms, subs, item: cur, audioIndex });
     if (token !== loadToken || closed) return;
     applySubs();
     drawInfo();
@@ -379,7 +379,9 @@ export function playVideo(app, item, opts = {}) {
   /** Show the chosen subtitles if they're delivered as files (burned-in ones need nothing). */
   function applySubs() {
     const s = ms?.MediaStreams?.find(x => x.Type === 'Subtitle' && x.Index === subIndex);
-    eng.setSubtitle(s && s.DeliveryMethod === 'External' && s.DeliveryUrl ? withUrl(s) : null);
+    // mpv also shows the file's own (embedded) subtitles; other engines get them burned in.
+    eng.setSubtitle(s && s.DeliveryMethod === 'External' && s.DeliveryUrl ? withUrl(s)
+      : s && eng.embeddedSubs && s.DeliveryMethod === 'Embed' ? s : null);
     if (eng.setSecondarySubtitle) {
       const s2 = secIndex != null && secIndex !== subIndex && textSubs().find(x => x.Index === secIndex);
       if (!s2) secIndex = null;
@@ -404,7 +406,8 @@ export function playVideo(app, item, opts = {}) {
     const burnedNow = old?.DeliveryMethod === 'Encode';
     subIndex = idx;
     if (reporter) reporter.info.subIndex = idx;
-    if ((s && s.DeliveryMethod === 'Encode') || burnedNow || (s && !s.DeliveryUrl && s.DeliveryMethod !== 'External')) {
+    const engineShows = s && eng.embeddedSubs && s.DeliveryMethod === 'Embed';
+    if ((s && s.DeliveryMethod === 'Encode') || burnedNow || (s && !s.DeliveryUrl && s.DeliveryMethod !== 'External' && !engineShows)) {
       load(position()); // the server has to (stop) burning them in
     } else {
       applySubs();
@@ -708,7 +711,10 @@ export function playVideo(app, item, opts = {}) {
     drawTime();
   }
   function seekBy(ds) { seekTo(position() + ds); }
+  // The desktop app's mpv fills the app's window, so fullscreen is the window's (engine-mpv.js).
+  const isFullscreen = () => (eng.toggleFullscreen ? eng.isFullscreen : !!document.fullscreenElement);
   function fullscreen() {
+    if (eng.toggleFullscreen) { eng.toggleFullscreen(); setTimeout(drawButtons, 300); return; }
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     else root.requestFullscreen?.().catch(() => {});
   }
@@ -814,7 +820,7 @@ export function playVideo(app, item, opts = {}) {
   // end, if playback hasn't moved and nothing new has buffered for 10 seconds, treat it as ended.
   let stall = { p: -1, b: -1, since: 0 };
   function checkStall() {
-    if (eng.kind === 'native' || !started || eng.paused || !askEl.hidden) { stall.since = 0; return; }
+    if (eng.kind === 'native' || eng.kind === 'mpv' || !started || eng.paused || !askEl.hidden) { stall.since = 0; return; }
     const p = position(), d = dur(), b = eng.bufferedTo(p);
     if (!d || d - p > 120 || b - p > 1 || p !== stall.p || b !== stall.b) { stall = { p, b, since: Date.now() }; return; }
     if (!stall.since) { stall.since = Date.now(); return; }
@@ -911,7 +917,7 @@ export function playVideo(app, item, opts = {}) {
       n: playNext, N: playNext, p: () => (list ? playPrev() : false), P: () => (list ? playPrev() : false),
       PageDown: nextChapter, PageUp: prevChapter,
       Enter: () => { if (askSeg && !skipEl.hidden) skipSegment(askSeg); else if (upNext === 'shown') playNext(); else return false; },
-      Escape: () => { if (menuEl) closeMenu(); else if (!document.fullscreenElement) close(); },
+      Escape: () => { if (menuEl) closeMenu(); else if (!isFullscreen()) close(); else if (eng.toggleFullscreen) fullscreen(); },
     }[k] || (/^[0-9]$/.test(k) && d ? () => { seekTo((d * Number(k)) / 10); osd(`${k}0%`); } : null);
     if (!handled || (k === 'Enter' && e.target.closest?.('button'))) return;
     if (handled() === false) return;

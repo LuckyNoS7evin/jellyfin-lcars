@@ -21,11 +21,15 @@ import { list } from './views/list.js';
 import { favourites } from './views/favourites.js';
 import { login } from './views/login.js';
 import { wizard } from './views/wizard.js';
-import { native, nativeVideoPlayer, exposeRouter } from './shell.js';
+import { native, nativeVideoPlayer, exposeRouter, desktopInput, desktopApp } from './shell.js';
 import { tvSetup } from './tv.js';
 import { remote as remoteView } from './views/remote.js';
 import { quickConnect } from './views/quickconnect.js';
 import { Remote } from './remote.js';
+
+// The desktop app draws mpv's picture behind the page, so there the page itself stays
+// see-through and the black is #app's (css/jf.css, engine-mpv.js).
+if (desktopApp()) document.documentElement.classList.add('desktop-app');
 
 // Assets live in .../static/<version>/ wherever LCARS is served from: /static/ by its own server,
 // /web/static/ (under any base URL) when Jellyfin hosts it as its web client.
@@ -934,8 +938,9 @@ function showLogin(username = '') {
 }
 
 /**
- * Inside Jellyfin's iPhone or LG TV app: its name for the device in the server's device list,
- * its player plugins (the iPhone's native player), and the router hooks its Home tab uses. The
+ * Inside Jellyfin's iPhone, LG TV or desktop app: its name for the device in the server's device
+ * list, its player plugins (the iPhone's native player), the desktop app's media keys, and the
+ * router hooks the iPhone's Home tab uses. The
  * LG app adds its shell after the page starts, so this runs again at each sign-in and start.
  */
 function adoptShell() {
@@ -943,6 +948,7 @@ function adoptShell() {
   const name = native.deviceName();
   if (name) app.api.device = name;
   nativeVideoPlayer({ onStop: () => app.player?.close?.() }).catch(() => {});
+  desktopInput(what => app.mediaKey(what)).catch(() => {});
 }
 app.adoptShell = adoptShell;
 exposeRouter({

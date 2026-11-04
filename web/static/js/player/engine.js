@@ -1,6 +1,6 @@
 // Playback engines. The player core (video.js) owns everything you see and everything Jellyfin
 // is told; an engine only turns a stream URL into pictures and sound. The web app uses the
-// browser engine (engine-web.js); the desktop app will add an mpv engine with the same shape,
+// browser engine (engine-web.js); the desktop app's mpv (engine-mpv.js) has the same shape,
 // so player features are written once, in the core.
 //
 // Settings: engines read the `playback` object from settings.js (bitrate, subtitle burn-in,
@@ -39,18 +39,25 @@
 //
 // Optional, browser only (the core checks before using them):
 //   setSecondarySubtitle(stream)   a second text subtitle at the top
+//
+// Optional, mpv only:
+//   embeddedSubs            true: setSubtitle also takes the file's own (Embed) subtitles
+//   toggleFullscreen(), isFullscreen    the app window's fullscreen
+//   load() also gets {item, audioIndex}
 //   canPip, pip, togglePip()       picture-in-picture
 import { webEngine } from './engine-web.js';
 import { nativeEngine } from './engine-native.js';
+import { mpvEngine, mpvAvailable } from './engine-mpv.js';
 import { readyVideoPlugin } from '../shell.js';
 
 /**
  * The engine for this app: the iPhone app's own player when it offers one and its setting is on
- * (engine-native.js), otherwise the browser's (until the desktop app supplies mpv).
+ * (engine-native.js), the desktop app's mpv (engine-mpv.js), otherwise the browser's.
  * pb: the playback settings (settings.js `playback`), the same object every engine reads.
  */
 export function createEngine(app, pb) {
   const p = readyVideoPlugin();
   if (p && p.canPlayItem?.()) return nativeEngine(app, pb, p);
+  if (mpvAvailable()) return mpvEngine(app, pb);
   return webEngine(app, pb);
 }

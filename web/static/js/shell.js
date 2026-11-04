@@ -43,6 +43,9 @@ let videoPlugin;
 export async function nativeVideoPlayer(hooks) {
   const s = shell();
   if (!s?.getPlugins) return null;
+  // The desktop app's plugins are built for jellyfin-web's player and input manager; LCARS uses
+  // its bridge instead (engine-mpv.js, desktopInput below).
+  if (desktopApp()) return null;
   if (videoPlugin === undefined) {
     videoPlugin = null;
     for (const name of call(s.getPlugins.bind(s)) || []) {
@@ -52,9 +55,8 @@ export async function nativeVideoPlayer(hooks) {
         const Cls = await make();
         if (typeof Cls !== 'function') continue;
         const p = new Cls({ events, playbackManager, loading: { show() {}, hide() {} }, appSettings: {}, globalize: { translate: k => k } });
-        // Only the iPhone app's player for now: engine-native.js follows its interface. The desktop
-        // app (Jellyfin Media Player) offers an mpv player that works differently; it keeps
-        // LCARS's own player until that's built and tested.
+        // The iPhone app's player (engine-native.js follows its interface). The desktop app's mpv
+        // plugin is skipped here: LCARS drives mpv's bridge directly (engine-mpv.js).
         if (p.type === 'mediaplayer' && p.name === 'ExpoVideoPlayer' && p.canPlayMediaType?.('Video')) { videoPlugin = p; break; }
       } catch (e) { console.warn('NativeShell plugin', name, e); }
     }
@@ -63,6 +65,22 @@ export async function nativeVideoPlayer(hooks) {
   if (hooks) playbackManager.onStop = hooks.onStop;
   return videoPlugin;
 }
+/** Jellyfin Desktop (formerly Jellyfin Media Player): its Qt bridge is on its way. */
+export const desktopApp = () => !!window.apiPromise && !!window.jmpInfo;
+
+// The desktop app's own input (media keys, its remote, MPRIS) as LCARS's media keys.
+const HOST_ACTIONS = { play_pause: 'playpause', play: 'play', pause: 'pause', stop: 'stop', next: 'next', previous: 'previous',
+  seek_forward: 'fastforward', seek_backward: 'rewind' };
+let inputHooked = false;
+export async function desktopInput(onKey) {
+  if (inputHooked || !desktopApp()) return;
+  inputHooked = true;
+  const api = await window.apiPromise;
+  api?.input?.hostInput?.connect?.(actions => {
+    for (const a of [].concat(actions || [])) if (HOST_ACTIONS[a]) onKey(HOST_ACTIONS[a]);
+  });
+}
+
 /** The plugin found by nativeVideoPlayer(), once it has looked (null until then, or if none). */
 export const readyVideoPlugin = () => videoPlugin || null;
 
