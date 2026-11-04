@@ -524,11 +524,11 @@ a.card-t:hover, a.card-s:hover, a.card-t:focus-visible, a.card-s:focus-visible {
 .ov-more { letter-spacing: 0; }
 /* a series/season badge sits top right; keep the overlay's buttons clear of it */
 .card-pic .badge { z-index: 0; }
-/* touch screens have no hover: keep the buttons visible but smaller */
+/* Touch screens have no hover, so the buttons would cover every poster all the time. As on a
+   TV (lcars.css), a tap opens the card (Continue watching and Next up play), and the title
+   page has play, watched, favourite and ⋯. Multi-select is for pointers too. */
 @media (hover: none) {
-  .card-ov { opacity: 1; }
-  .ov-play { width: 50px; height: 32px; opacity: .92; }
-  .ov-play::before { border-left-width: 12px; border-top-width: 7px; border-bottom-width: 7px; margin-left: 4px; }
+  .card-ov, .card-sel { display: none !important; }
 }
 
 /* ---- book reader ---------------------------------------------------------------------------- */
@@ -634,7 +634,6 @@ a.card-t:hover, a.card-s:hover, a.card-t:focus-visible, a.card-s:focus-visible {
 .selbar .sel-n { color: var(--orange); font-size: 22px; white-space: nowrap; }
 .selbar .sel-acts { display: flex; gap: 6px; flex-wrap: wrap; }
 .selbar .grow { flex: 1; }
-@media (hover: none) { .card-sel { opacity: .85; } }
 @media (max-width: 760px) {
   .selbar { bottom: 8px; gap: 6px; }
   .selbar .sel-n { font-size: 17px; }
