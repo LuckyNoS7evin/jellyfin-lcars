@@ -17,6 +17,7 @@ const QUALITIES = [
   ['8 Mbps', 8e6], ['4 Mbps', 4e6], ['2 Mbps', 2e6], ['1 Mbps', 1e6],
 ];
 
+const REPEATS = [['Off', 'RepeatNone'], ['All', 'RepeatAll'], ['One', 'RepeatOne']];
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 const ASPECTS = [['Auto', 'auto'], ['Fill the screen (crop)', 'cover'], ['Stretch', 'fill']];
 // Official plugins/stillWatching/constants.ts: items played, and hours without input.
@@ -75,6 +76,9 @@ export function playVideo(app, item, opts = {}) {
   let full = null;          // cur with chapters and trickplay info
   let list = opts.list?.length ? [...opts.list] : null;
   let listIndex = list ? Math.max(0, opts.index || 0) : 0;
+  // Official repeat modes: RepeatAll starts the list again (after any intros), RepeatOne this item.
+  let repeat = 'RepeatNone';
+  const introIds = new Set();
   let ms = null;            // media source
   let wantSource = opts.mediaSourceId; // version chosen on the title page (first item only)
   let playSessionId = null;
@@ -114,7 +118,7 @@ export function playVideo(app, item, opts = {}) {
   eng.aspect = app.us.local('aspectRatio', 'auto');
 
   const position = () => eng.position;
-  const state = () => ({ position: position(), paused: eng.paused, muted: eng.muted, volume: eng.volume });
+  const state = () => ({ position: position(), paused: eng.paused, muted: eng.muted, volume: eng.volume, repeat });
 
   function setStatus(text, blink = false) {
     statusEl.textContent = text || '';
@@ -215,10 +219,35 @@ export function playVideo(app, item, opts = {}) {
       chapters().length > 1 ? btn([h('span', 'Chapter'), arrow('r')], nextChapter, { color: 'blue', title: 'Next chapter (Page Down)' }) : null,
       list && listIndex > 0 ? btn('Previous', playPrev, { color: 'blue', title: list[listIndex - 1].Name }) : null,
       nextEp ? btn('Next', playNext, { color: 'blue', title: nextEp.Name }) : null,
+      introIds.has(cur.Id) ? null : btn(isFav() ? '★' : '☆', toggleFav, { color: 'salmon', ghost: !isFav(), title: isFav() ? 'Remove from favourites' : 'Add to favourites' }),
       // The volume meter sits inside the lilac bar.
       h('span.grow', volBar),
       btn(isFullscreen() ? 'Window' : 'Full screen', fullscreen, { color: 'salmon' }),
       h('span.grow.r'));
+  }
+
+  // ---- favourite ----------------------------------------------------------------------------
+
+  const userData = () => (full?.Id === cur.Id ? full.UserData : null) || cur.UserData || (cur.UserData = {});
+  const isFav = () => !!userData().IsFavorite;
+  async function toggleFav() {
+    const it = cur, ud = userData(), on = !ud.IsFavorite;
+    try {
+      const r = await api.setFavorite(it.Id, on);
+      Object.assign(ud, r || { IsFavorite: on });
+      if (it.UserData && it.UserData !== ud) it.UserData.IsFavorite = ud.IsFavorite;
+    } catch (e) { toast('Unable to comply', e.message, 'red'); return; }
+    if (closed || cur !== it) return;
+    osd(on ? 'Added to favourites' : 'Removed from favourites', it.Name);
+    drawButtons();
+  }
+
+  function setRepeat(mode) {
+    if (!REPEATS.some(r => r[1] === mode)) return;
+    repeat = mode;
+    osd('Repeat', REPEATS.find(r => r[1] === mode)[0]);
+    reporter?.progress('RepeatModeChange');
+    if (menuEl?.dataset.kind === 'options') menu('options', true);
   }
 
   // ---- menus ------------------------------------------------------------------------------
@@ -253,6 +282,10 @@ export function playVideo(app, item, opts = {}) {
       title = 'Quality';
       color = 'c-lilac';
       rows = [back, ...QUALITIES.map(([label, bps]) => [label, bps === maxBitrate, () => switchQuality(bps)])];
+    } else if (kind === 'repeat') {
+      title = 'Repeat';
+      color = 'c-lilac';
+      rows = [back, ...REPEATS.map(([label, m]) => [label, repeat === m, () => setRepeat(m)])];
     } else if (kind === 'speed') {
       title = 'Playback speed';
       color = 'c-lilac';
@@ -273,6 +306,7 @@ export function playVideo(app, item, opts = {}) {
       rows = [
         canTranscode() ? ['Quality', false, sub('quality'), QUALITIES.find(q => q[1] === maxBitrate)?.[0] || 'Auto'] : null,
         ['Playback speed', false, sub('speed'), eng.rate === 1 ? 'Normal' : `${eng.rate}×`],
+        sync ? null : ['Repeat', false, sub('repeat'), REPEATS.find(r => r[1] === repeat)[0]],
         ['Aspect ratio', false, sub('aspect'), ASPECTS.find(x => x[1] === eng.aspect)?.[0]],
         hasSubs ? h('div.p-mrow',
           h('span', 'Subtitle delay'),
@@ -716,6 +750,7 @@ export function playVideo(app, item, opts = {}) {
         ? api.get(`/Videos/${item.Id}/AdditionalParts`, { userId: api.userId, fields: Api.FIELDS }).then(r => r.Items || []).catch(() => []) : [],
     ]);
     if (!intros.length && !parts.length) return;
+    intros.forEach(i => introIds.add(i.Id));
     const entries = [...intros, item, ...parts];
     if (list) list.splice(listIndex, 1, ...entries); else { list = entries; listIndex = 0; }
     cur = list[listIndex];
@@ -848,7 +883,15 @@ export function playVideo(app, item, opts = {}) {
   function ended() {
     // The end of the group's queue: done together, still in the group.
     if (sync) { if (nextEp) sync.requestNext(); else close({ replaced: true }); return; }
-    if (nextEp && (list || pb.autoplayNext)) playNext(); else close();
+    if (repeat === 'RepeatOne') { go(cur); return; }
+    if (nextEp && (list || pb.autoplayNext)) { playNext(); return; }
+    if (repeat === 'RepeatAll') {
+      if (!list) { go(cur); return; }
+      listIndex = Math.max(0, list.findIndex(x => !introIds.has(x.Id)));
+      go(list[listIndex]);
+      return;
+    }
+    close();
   }
   eng.on('ended', ended);
   // Some files end early on one track: the video and one audio track stop a minute before
@@ -1009,6 +1052,7 @@ export function playVideo(app, item, opts = {}) {
     setMuted: m => { eng.muted = m; showVolume(); },
     toggleMute: () => { toggleMute(); showVolume(); },
     fullscreen,
+    setRepeat,
     // Watch together: the group's commands act here directly (syncplay.js).
     local: {
       // As at load: if the browser won't start it with sound (no click on the page yet), start

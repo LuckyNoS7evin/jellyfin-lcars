@@ -812,6 +812,7 @@ function playerCommand(name, a) {
       case 'SetAudioStreamIndex': p.setAudio(Number(a.Index)); return true;
       case 'SetSubtitleStreamIndex': p.setSubs(Number(a.Index)); return true;
       case 'ToggleFullscreen': p.fullscreen(); return true;
+      case 'SetRepeatMode': p.setRepeat(a.RepeatMode); return true;
       default: return false;
     }
   }
