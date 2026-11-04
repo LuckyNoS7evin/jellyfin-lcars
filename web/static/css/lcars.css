@@ -152,6 +152,7 @@ ul { list-style: none; }
 .pill-t { font-size: 17px; line-height: 1.05; font-weight: 700; }
 .pill.offline { --c: var(--dim); }
 .pill.filler { flex: 1; min-height: 24px; cursor: default; --c: var(--peach); }
+.menu-btn { display: none; }
 .pill.filler:hover { filter: none; }
 .pill.link { cursor: default; --c: var(--blue); }
 .pill.link:hover { filter: none; }
@@ -327,6 +328,35 @@ ul { list-style: none; }
   .pill { min-height: 40px; flex: 1 1 88px; padding: 3px 8px 4px; }
   .pill-t { font-size: 14px; }
   .pill.filler { display: none; }
+  /* A compact header: the page title and the time, who's signed in, what's playing. */
+  .hdr { min-height: 92px; }
+  .hdr-content { gap: 4px 12px; }
+  .hdr-title h1 { font-size: 30px; }
+  .hdr-clock { font-size: 14px; margin-top: 2px; }
+  .hdr-clock .sd { display: none; }
+  .hdr-status .line:not(.marq) { display: none; }
+  /* The menu: one row (Back, Home, Search, Menu); Menu opens all of it over the page. */
+  .rail:not(.open) > .pill:not(.keep):not(.menu-btn) { display: none; }
+  .rail:not(.open) > .pill { flex: 1 1 0; min-width: 0; }
+  .rail:not(.open) > .back-btn { order: 1; }
+  .rail:not(.open) > .k2 { order: 2; }
+  .rail:not(.open) > .k3 { order: 3; }
+  .rail:not(.open) > .menu-btn { order: 4; }
+  .menu-btn { display: flex; }
+  .rail.open {
+    position: fixed; inset: 0; z-index: 150; background: #000; overflow-y: auto; overscroll-behavior: contain;
+    display: grid; grid-template-columns: 1fr 1fr; align-content: start; gap: var(--gap);
+    padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom));
+  }
+  .rail.open::before {
+    content: "Menu"; grid-column: 1 / -1; order: -2; height: 40px; display: flex; align-items: center; padding: 0 22px;
+    background: var(--orange); color: #000; font-size: 26px; font-weight: 700; border-radius: 20px;
+  }
+  .rail.open > .pill { min-height: 56px; }
+  .rail.open > .menu-btn, .rail.open > .back-btn { order: -1; }
+  .rail.open > .pill.link { grid-column: 1 / -1; }
+  .rail.open .pill-t { font-size: 17px; }
+  html.menu-open { overflow: hidden; }
   .decks, .foot-slot { padding-left: 0; padding-right: 0; }
   .deck-head h2 { font-size: 22px; }
   .deck-head .code { display: none; }

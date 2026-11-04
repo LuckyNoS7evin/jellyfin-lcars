@@ -124,7 +124,7 @@ export async function library(ctx) {
   // No tab in the address: the library's saved default ("Opens on" in Settings).
   const landing = app.homePrefs?.[`landing-${view.Id}`];
   const tab = tabs.find(t => t.id === query.get('tab')) || (landing && tabs.find(t => t.landing === landing)) || tabs[0];
-  const tabBar = () => (tabs.length > 1 ? h('div.tabs', tabs.map(t => h('a.tab', { href: `#/lib/${view.Id}?tab=${t.id}`, class: t.id === tab.id ? 'on' : '' }, t.label))) : null);
+  const tabBar = () => (tabs.length > 1 ? h('div.tabs.lib-tabs', tabs.map(t => h('a.tab', { href: `#/lib/${view.Id}?tab=${t.id}`, class: t.id === tab.id ? 'on' : '' }, t.label))) : null);
   // Coming back to a library tab (the rail, the tab bar) brings back its filters and sort, as
   // the official client does (saveQuerySettings): saved per device for each library and tab,
   // restored when the address carries nothing but the tab. The letter jump isn't kept.
@@ -226,6 +226,7 @@ export async function library(ctx) {
     : mode === 'List' ? { details: true, ...(tab.wide ? { shape: 'wide', episodeImages: app.us.episodeImages } : {}) } : {};
 
   const countEl = h('span.count');
+  const countEl2 = h('span.count'); // the phone's summary line (below)
   const grid = h('div.grid', { class: [mode === 'Thumb' ? 'wide' : '', mode === 'List' ? 'list' : '', mode === 'List' && tab.wide ? 'wide' : ''].filter(Boolean).join(' ') });
   const status = h('div', loading());
   const sentinel = h('div.sentinel');
@@ -244,7 +245,7 @@ export async function library(ctx) {
       start += r.Items.length;
       if (r.Items.length < PAGE) total = start;
       grid.append(...r.Items.map(i => card(api, i, { color, ...cardOpts })));
-      countEl.textContent = `${total.toLocaleString()} records`;
+      countEl.textContent = countEl2.textContent = `${total.toLocaleString()} records`;
       if (playBtns) playBtns.hidden = total === 0;
       fill(status, total === 0 ? empty('No records match') : null);
     } catch (e) {
@@ -361,17 +362,34 @@ export async function library(ctx) {
     activeCount ? h('div.fgroup', h('a.tab.clear', { href: `#/lib/${view.Id}?${new URLSearchParams({ tab: tab.id, sort, order })}` }, 'Clear all filters')) : null);
   if (!panel.hidden) drawPanel();
 
-  const node = deck(tabs.length > 1 ? `${view.Name} · ${tab.label}` : view.Name, { color, code: code(view.Id) },
-    tabBar(),
-    h('div.tabs',
+  // On a phone the controls fold into an Options panel behind one summary line: the sort, Filters
+  // and the count (css/jf.css). Opening it from Filters opens the filters too.
+  const opts = h('div.tabs.lib-opts',
       playBtns,
       tab.sorts.length > 1 ? [h('span.lbl', 'Sort'), sortSel, sort !== 'random' ? orderBtn : null] : null,
       filterBtn,
       h('a.tab', { href: `#/search?in=${view.Id}`, title: `Search ${view.Name}` }, 'Search'),
       viewChips,
-      countEl),
+      countEl);
+  const toggleOpts = withFilters => {
+    const open = !node.classList.contains('opts-open');
+    node.classList.toggle('opts-open', open);
+    if (open && withFilters && panel.hidden) { panel.hidden = false; drawPanel(); }
+  };
+  const sortLabel = sort === 'random' ? SORTS[sort][0] : `${SORTS[sort]?.[0] || 'Sort'} ${order === 'desc' ? '▼' : '▲'}`;
+  const summary = h('div.tabs.lib-sum',
+    tab.sorts.length > 1 ? h('button.tab', { type: 'button', onclick: () => toggleOpts(false), attrs: { 'aria-label': 'Sort and options' } }, sortLabel)
+      : h('button.tab', { type: 'button', onclick: () => toggleOpts(false) }, 'Options'),
+    filterBtn ? h('button.tab', { type: 'button', class: activeCount ? 'on' : '', onclick: () => toggleOpts(true) }, activeCount ? `Filters · ${activeCount}` : 'Filters') : null,
+    countEl2);
+  const node = deck(tabs.length > 1 ? `${view.Name} · ${tab.label}` : view.Name, { color, code: code(view.Id) },
+    tabBar(),
+    summary,
+    opts,
     panel,
     h('div.lib-body', h('div.lib-main', grid, status, sentinel), alphaBar()));
+  // Back from picking a filter chip: the filters are open, so the phone's panel is too.
+  if (!panel.hidden) node.classList.add('opts-open');
 
   function alphaBar() {
     const letters = ['#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];

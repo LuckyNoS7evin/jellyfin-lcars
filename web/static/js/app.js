@@ -432,8 +432,27 @@ function drawHeader() {
 
 const LINK = { live: ['live', 'Link active'], connecting: ['wait', 'Establishing'], offline: ['lost', 'Link lost'] };
 
+// On a phone the rail is one row (Back, Home, Search, Menu) and Menu opens all of it as a panel
+// (css/lcars.css); a new page closes it.
+let menuOpen = false;
+function setMenu(open) {
+  menuOpen = open;
+  railEl.querySelector('.rail')?.classList.toggle('open', open);
+  document.documentElement.classList.toggle('menu-open', open);
+  const b = railEl.querySelector('.menu-btn .pill-t');
+  if (b) b.textContent = open ? 'Close' : 'Menu';
+  if (open) railEl.querySelector('.rail .pill:not(.menu-btn)')?.focus?.();
+}
+railEl.addEventListener('click', e => { if (menuOpen && e.target.closest('a.pill')) setMenu(false); });
+document.addEventListener('keydown', e => { if (menuOpen && e.key === 'Escape') { setMenu(false); e.stopPropagation(); } }, true);
+
 function drawRail(path = '') {
   const authed = app.api.authed;
+  menuOpen = false;
+  document.documentElement.classList.remove('menu-open');
+  const menuBtn = h('button.pill.c-lilac.menu-btn', { type: 'button', onclick: () => setMenu(!menuOpen), attrs: { 'aria-label': 'Menu' } },
+    h('span.pill-n', 'MNU'), h('span.pill-t', 'Menu'));
+  const keep = (el, n) => { el.classList.add('keep', `k${n}`); return el; };
   const pill = (href, n, label, color, active) => h('a.pill', { href, class: `c-${color}${active ? ' active' : ''}`, attrs: active ? { 'aria-current': 'page' } : {} },
     h('span.pill-n', n), h('span.pill-t', label));
   const [lcls, ltxt] = LINK[app.link] || LINK.connecting;
@@ -442,21 +461,23 @@ function drawRail(path = '') {
   frameEl.classList.toggle('eng', !!eng);
   fill(railEl, h('div.rail',
     eng ? [
-      h('button.pill.c-blue.back-btn', {
+      h('button.pill.c-blue.back-btn.keep', {
         type: 'button', onclick: goBack, disabled: !canGoBack(path),
         title: 'Back (Backspace)', attrs: { 'aria-label': 'Back' },
       }, arrow('l'), h('span.pill-t', 'Back')),
+      menuBtn,
       app.adminRail(path).map(p => pill(p.href, p.n, p.label, p.color, p.active)),
       pill('#/home', 'EXT', 'Leave engineering', 'peach', false),
     ] : authed ? [
-      h('button.pill.c-blue.back-btn', {
+      h('button.pill.c-blue.back-btn.keep', {
         type: 'button', onclick: goBack, disabled: !canGoBack(path),
         title: 'Back (Backspace)', attrs: { 'aria-label': 'Back' },
       }, arrow('l'), h('span.pill-t', 'Back')),
-      pill('#/home', '01', 'Home', 'orange', path === '/home'),
+      keep(pill('#/home', '01', 'Home', 'orange', path === '/home'), 2),
       app.views.map((v, i) => pill(`#/lib/${v.Id}`, String(i + 2).padStart(2, '0'), v.Name, colorAt(i + 1), path.startsWith(`/lib/${v.Id}`))),
       pill('#/favourites', 'FAV', 'Favourites', 'salmon', path === '/favourites'),
-      pill('#/search', 'SRC', 'Search', 'peach', path === '/search'),
+      keep(pill('#/search', 'SRC', 'Search', 'peach', path === '/search'), 3),
+      menuBtn,
       app.queue.active ? pill('#/queue', 'AUD', 'Audio queue', 'sky', path === '/queue') : null,
       pill('#/settings', 'CFG', 'Settings', 'red', path === '/settings'),
       isAdminUser() ? pill('#/admin/overview', 'ENG', 'Engineering', 'orange', path.startsWith('/admin')) : null,

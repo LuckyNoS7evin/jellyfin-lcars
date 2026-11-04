@@ -355,7 +355,12 @@ html.mpv-playing #app { visibility: hidden; }
   .hero-title { font-size: 32px; }
   .overview { font-size: 16px; }
   .ep { grid-template-columns: 130px minmax(0, 1fr); }
-  .ep-side { grid-column: 2; flex-direction: row; align-items: center; }
+  /* Under the episode, full width, wrapping: four fixed-width buttons in a row were wider than
+     a phone, and iOS zoomed the whole page out to fit them. */
+  .ep-side { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .ep-side .btn.small { min-width: 0; }
+  /* Nothing may make a phone's page wider than the screen. */
+  html, body { overflow-x: clip; }
   .trk { grid-template-columns: 2em minmax(0, 1fr) 3.6em; }
   .trk-a { display: none; }
   .mini { grid-template-columns: 44px minmax(0, 1fr) auto; }
@@ -751,3 +756,22 @@ a.np-title:hover, a.np-title:focus-visible { text-decoration: underline; outline
 .pin-file { font-family: ui-monospace, monospace; font-size: 14px; color: var(--peach); word-break: break-all; margin: 4px 0 10px; text-transform: none; }
 /* Watch together: who is in the group */
 .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+/* Library controls on a phone (views/library.js): the tabs swipe sideways in one row, and sort,
+   order, filters, search, view and shuffle fold into an Options panel behind one summary line. */
+.lib-sum { display: none; }
+@media (max-width: 760px) {
+  .lib-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-bottom: 10px; -webkit-overflow-scrolling: touch; }
+  .lib-tabs::-webkit-scrollbar { display: none; }
+  .lib-tabs .tab { flex: none; }
+  .lib-sum { display: flex; flex-wrap: nowrap; margin-bottom: 12px; }
+  .deck:not(.opts-open) .lib-opts, .deck:not(.opts-open) .filters { display: none; }
+  .opts-open .lib-opts {
+    border-left: 10px solid var(--sc, var(--lilac)); border-radius: 0 20px 20px 0; background: #0b0a10;
+    padding: 10px 14px; margin: -4px 0 8px; row-gap: 10px;
+  }
+  .opts-open .lib-opts::before { content: "Options"; flex: 0 0 100%; color: var(--sc, var(--lilac)); font-size: 20px; font-weight: 700; }
+  .opts-open .lib-opts .count { display: none; }
+  .opts-open .lib-play:not([hidden]) { flex: 0 0 100%; display: flex; gap: 6px; }
+  .opts-open .lib-sum .tab:first-child { background: var(--sc, var(--sky)); color: #000; }
+}
+
