@@ -5,6 +5,7 @@ import { h, fill } from '../h.js';
 import { Api } from '../api.js';
 import { deck, card, empty, errorBox, loading, whenVisible, code, toast, btn } from '../ui.js';
 import { movieSuggestions, tvSuggestions, musicSuggestions, upcoming, networks, genres } from './libtabs.js';
+import { selectAllSource } from '../select.js';
 
 // key -> [label, SortBy]
 const SORTS = {
@@ -233,6 +234,13 @@ export async function library(ctx) {
   let start = 0;
   let total = Infinity;
   let busy = false;
+  // Select all: everything this view would list, not just the pages loaded so far.
+  selectAllSource(grid, {
+    done: () => start >= total,
+    load: async () => (tab.artists
+      ? await api.get(tab.artists, { userId: api.userId, parentId: view.Id, sortBy: 'SortName', sortOrder: base.sortOrder, nameStartsWith: filterQuery.nameStartsWith, nameLessThan: filterQuery.nameLessThan }, { signal })
+      : await api.items({ ...base, startIndex: 0, limit: undefined }, { signal })).Items || [],
+  });
 
   async function more() {
     if (busy || start >= total || signal.aborted) return;

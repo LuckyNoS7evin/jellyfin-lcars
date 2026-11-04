@@ -648,6 +648,7 @@ a.card-t:hover, a.card-s:hover, a.card-t:focus-visible, a.card-s:focus-visible {
 .selbar .cap { flex: 0 0 30px; align-self: stretch; min-height: 52px; background: var(--orange); border-radius: 26px 0 0 26px; }
 .selbar .cap.r { border-radius: 0 26px 26px 0; background: var(--lilac); }
 .selbar .sel-n { color: var(--orange); font-size: 22px; white-space: nowrap; }
+.selbar .sel-wait { color: var(--lilac); white-space: nowrap; animation: blink 1s steps(2) infinite; }
 .selbar .sel-acts { display: flex; gap: 6px; flex-wrap: wrap; }
 .selbar .grow { flex: 1; }
 @media (max-width: 760px) {

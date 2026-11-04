@@ -2,7 +2,9 @@
 // bottom of the screen. Each card has a select button (top left; shown on hover, and always
 // while selecting). While anything is selected, clicking a card toggles it instead of opening
 // it; Shift-click selects a range within the same row or grid; a long press starts selecting
-// on touch screens; Esc or Clear ends it. Selection ends when you leave the page.
+// on touch screens; Select all (or Ctrl+A) takes the rest of that row or grid, or of the whole
+// library where the page says how to fetch it; Esc or Clear ends it. Selection ends when you
+// leave the page.
 //
 // Actions are registered with addSelectAction(), so later features (bulk actions, the admin
 // dashboard's Group versions) plug in here without touching the cards.
@@ -14,6 +16,7 @@ const cardItem = new WeakMap();  // card element -> item
 const actions = [];
 let lastCard = null;             // anchor for Shift-click ranges
 let bar = null;
+const sources = new WeakMap(); // grid element -> { done(), load() } for lists loaded in pages
 
 /**
  * Register an action for the bar. def: {id, label, color, when(items) -> bool, run(items)}.
@@ -27,6 +30,12 @@ export function addSelectAction(def) {
   // Returns a remover, for actions that belong to one page (Remove from collection).
   return () => { const j = actions.indexOf(def); if (j >= 0) actions.splice(j, 1); if (selected.size) draw(); };
 }
+
+/**
+ * A grid that loads in pages (a library): Select all fetches everything it would show with
+ * load() -> items, unless done() says every card is already on the page.
+ */
+export function selectAllSource(grid, src) { sources.set(grid, src); }
 
 export const isSelecting = () => selected.size > 0;
 export const isSelected = id => selected.has(id);
@@ -45,7 +54,7 @@ export function selectable(card, item) {
 function setCard(card, on) {
   const item = cardItem.get(card);
   if (!item) return;
-  if (on) selected.set(item.Id, item); else selected.delete(item.Id);
+  if (on) selected.set(item.Id, item); else { selected.delete(item.Id); allOf = null; }
   // The same item can be on the page twice (two shelves): keep every copy in step.
   for (const c of document.querySelectorAll(`.card[data-key="${CSS.escape(item.Id)}"]`)) {
     c.classList.toggle('selected', on);
@@ -69,10 +78,49 @@ function toggle(card, range = false) {
   draw();
 }
 
+// The row or grid being selected from: the last card picked, else any selected card on screen.
+function scope() {
+  if (lastCard?.isConnected) return lastCard.parentElement;
+  return document.querySelector('.card.selected')?.parentElement || null;
+}
+const cardsIn = grid => [...(grid?.children || [])].filter(c => cardItem.has(c));
+
+function canSelectAll() {
+  const grid = scope();
+  if (!grid) return false;
+  if (allOf === grid) return false;
+  const src = sources.get(grid);
+  return cardsIn(grid).some(c => !selected.has(cardItem.get(c).Id)) || (!!src && !src.done());
+}
+
+let loadingAll = false;
+let allOf = null; // the grid whose every item is selected (until one is unpicked)
+async function selectAll() {
+  const grid = scope();
+  if (!grid || loadingAll) return;
+  const src = sources.get(grid);
+  let items = cardsIn(grid).map(c => cardItem.get(c));
+  if (src && !src.done()) {
+    loadingAll = true;
+    draw();
+    try { items = await src.load(); } catch (e) { toast('Unable to comply', e.message, 'red'); loadingAll = false; draw(); return; }
+    loadingAll = false;
+    if (!grid.isConnected) { draw(); return; }
+  }
+  for (const it of items) selected.set(it.Id, it);
+  allOf = grid;
+  for (const c of document.querySelectorAll('.card')) {
+    const it = cardItem.get(c);
+    if (it && selected.has(it.Id)) { c.classList.add('selected'); c.querySelector('.card-sel')?.setAttribute('aria-pressed', 'true'); }
+  }
+  draw();
+}
+
 export function clearSelection() {
   if (!selected.size) return;
   selected.clear();
   lastCard = null;
+  allOf = null;
   for (const c of document.querySelectorAll('.card.selected')) {
     c.classList.remove('selected');
     c.querySelector('.card-sel')?.setAttribute('aria-pressed', 'false');
@@ -89,6 +137,8 @@ function draw() {
   fill(bar,
     h('span.cap'),
     h('b.sel-n', `${items.length} selected`),
+    loadingAll ? h('span.sel-wait', 'Fetching…')
+      : canSelectAll() ? btn('Select all', selectAll, { color: 'lilac', ghost: true, small: true, title: 'Select every item here (Ctrl+A)' }) : null,
     h('div.sel-acts', usable.map(a => btn(a.label, () => run(a, items), { color: a.color || 'sky', small: true }))),
     h('span.grow'),
     btn('Clear', clearSelection, { color: 'red', ghost: true, small: true, title: 'Clear the selection (Esc)' }),
@@ -132,5 +182,8 @@ function suppressClick() {
 }
 
 document.addEventListener('keydown', e => {
+  if (selected.size && (e.ctrlKey || e.metaKey) && e.key === 'a' && !e.target.closest?.('input, textarea, select, [contenteditable]')) {
+    e.preventDefault(); selectAll(); return;
+  }
   if (e.key === 'Escape' && selected.size && !document.querySelector('dialog[open], .player')) { clearSelection(); e.preventDefault(); }
 });
