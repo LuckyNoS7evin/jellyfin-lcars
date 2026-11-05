@@ -73,6 +73,7 @@ It's a drop-in for `jellyfin/jellyfin`: the same volumes, ports, devices, user, 
 
 - TV, phone and desktop apps (Android TV, Findroid, Swiftfin, Infuse, Kodi...) talk to the server as with any Jellyfin. Apps that show the server's own web pages (the official iPhone and Android apps, the LG TV app, Jellyfin Media Player) show LCARS, with their native hooks (the iPhone app's player, the TV remote).
 - On start the container installs LCARS's plugin (`plugin/`) into Jellyfin's plugins folder. It records transcode and storage history for Engineering → Diagnostics.
+- It also installs [HEIC Photos](https://github.com/LuckyNoS7evin/jellyfin-heic-plugin), so iPhone photos (HEIC) show in photo libraries in every Jellyfin app, converted with Jellyfin's ffmpeg when they're viewed (Jellyfin can't read them on its own and skips them). `LCARS_HEIC_PHOTOS=false` leaves it out; a newer copy from a plugin catalogue is left in place.
 - Tags: `latest`, and the Jellyfin version it's built on, e.g. `12.4` (the newest LCARS on Jellyfin 12.4.x). `12.4-<first 7 of the commit>` pins one build. Each Jellyfin release gets a new build within a day.
 
 ## How it works
