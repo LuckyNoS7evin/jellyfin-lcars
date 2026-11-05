@@ -222,6 +222,18 @@ const app = {
     drawHeader();
   },
 
+  /** A remote (YouTube) trailer in the player's frame; music pauses. Other sites open a tab. */
+  async playTrailer(it, trailer) {
+    const { openTrailer, remoteTrailer } = await import('./trailer.js');
+    const t = trailer || remoteTrailer(it);
+    if (!t) { toast('No trailer', it.Name, 'salmon'); return; }
+    this.queue.pause();
+    stopTheme();
+    this.player?.close({ replaced: true });
+    const ctl = openTrailer(this, it, t);
+    if (ctl) { this.player = ctl; drawHeader(); }
+  },
+
   /** Photos in the viewer (loaded on first use), from items[index]. Music keeps playing. */
   async viewPhotos(items, index = 0) {
     const { openPhotos } = await import('./photos.js');
@@ -872,8 +884,11 @@ async function generalCommand(name, a) {
     case 'PlayTrailers': {
       if (!a.ItemId) return;
       const r = await app.api.get(`/Items/${a.ItemId}/LocalTrailers`, { userId: app.api.userId });
-      if (r?.length) app.playList(r);
-      else toast('No trailer', 'This title has no local trailer', 'salmon');
+      if (r?.length) { app.playList(r); return; }
+      // No trailer file: the one from its metadata (YouTube), as the official client does.
+      const it = await app.api.item(a.ItemId);
+      if ((it.RemoteTrailers || []).length) app.playTrailer(it);
+      else toast('No trailer', it.Name, 'salmon');
       return;
     }
     default:

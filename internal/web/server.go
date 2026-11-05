@@ -49,8 +49,9 @@ func (s *Server) Handler() http.Handler {
 // (TMDb, TVDB, fanart.tv...) as the official client does; images only, no scripts or fetches.
 // 'wasm-unsafe-eval' lets the subtitle renderers (libass, libbitsub) compile WebAssembly;
 // it does not allow eval() of JavaScript.
+// frame-src youtube-nocookie.com: remote (YouTube) trailers play in YouTube's own player, framed.
 const csp = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob: https:; " +
-	"media-src 'self' blob:; worker-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-src 'self'; " +
+	"media-src 'self' blob:; worker-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-src 'self' https://www.youtube-nocookie.com; " +
 	"manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 
 // pluginHostCSP is for plugin-host.html, where the admin dashboard runs a plugin's own settings

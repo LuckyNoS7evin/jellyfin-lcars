@@ -1,6 +1,6 @@
 // Details for any item: films and episodes (play, tracks, cast), series and seasons
 // (episodes), albums and artists (tracks), collections, playlists and people.
-import { native } from '../shell.js';
+import { remoteTrailer, youTubeId } from '../trailer.js';
 import { h, fill } from '../h.js';
 import { Api, TICKS } from '../api.js';
 import * as f from '../fmt.js';
@@ -181,7 +181,7 @@ function airs(it) {
   return h('div.hero-airs', `${it.Status === 'Ended' ? 'Aired' : 'Airs'} ${days}${it.AirTime ? ` at ${it.AirTime}` : ''}`.replace(/\s+/g, ' '));
 }
 
-/** Trailer button: a local trailer plays here, otherwise the first remote one opens. */
+/** Trailer button: a local trailer, otherwise the remote one (YouTube in the player's frame). */
 function trailerButton(ctx, it) {
   const { api, app } = ctx;
   if (it.LocalTrailerCount > 0) {
@@ -192,9 +192,10 @@ function trailerButton(ctx, it) {
       } catch (e) { toast('Unable to comply', e.message, 'red'); }
     }, { color: 'blue' });
   }
-  const remote = (it.RemoteTrailers || []).filter(t => /^https?:/i.test(t.Url));
-  if (!remote.length) return null;
-  return btn('Trailer ↗', () => native.openExternal(remote[0].Url), { color: 'blue', title: remote[0].Name || 'Trailer' });
+  const remote = remoteTrailer(it);
+  if (!remote) return null;
+  // YouTube plays here; another site opens in a tab (hence the arrow).
+  return btn(youTubeId(remote.Url) ? 'Trailer' : 'Trailer ↗', () => app.playTrailer(it, remote), { color: 'blue', title: remote.Name || 'Trailer' });
 }
 
 /** After a menu action on a title page: leave if it was deleted, else redraw. */
