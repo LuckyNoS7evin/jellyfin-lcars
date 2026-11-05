@@ -11,6 +11,7 @@ import {
 import { themeFor } from '../player/theme.js';
 import { menuButton, canManageCollections, download } from '../menu.js';
 import { addSelectAction } from '../select.js';
+import { bookSeries, nextVolume, upNext, byVolume } from '../books.js';
 
 /** Where Back goes when there's no history: one level up. */
 function parentOf(it) {
@@ -88,7 +89,8 @@ function facts(it) {
   if (it.CommunityRating) out.push(`★ ${it.CommunityRating.toFixed(1)}`);
   if (it.CriticRating) out.push(`${it.CriticRating}% critics`);
   const rt = runtime(it);
-  if (rt && it.Type !== 'Series') out.push(rt);
+  // A book's "running time" is the reader's position counter, not a length.
+  if (rt && it.Type !== 'Series' && it.Type !== 'Book') out.push(rt);
   if (it.RunTimeTicks && VIDEO_TYPES.has(it.Type)) {
     const left = (it.RunTimeTicks - (it.UserData?.PlaybackPositionTicks || 0)) / TICKS;
     out.push(`Ends ${new Date(Date.now() + left * 1000).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`);
@@ -756,10 +758,10 @@ function bookButtons(ctx, it) {
 async function seriesReadButton(ctx, it) {
   const { api, signal } = ctx;
   try {
-    const r = await api.items({ parentId: it.Id, includeItemTypes: 'Book', sortBy: 'SortName', fields: 'UserData', limit: 2000 }, { signal });
+    const r = await api.items({ parentId: it.Id, includeItemTypes: 'Book', fields: 'UserData', limit: 2000 }, { signal });
     if (!r.Items.length) return null;
-    const next = r.Items.find(b => !b.UserData?.Played && b.UserData?.PlaybackPositionTicks > 0)
-      || r.Items.find(b => !b.UserData?.Played);
+    r.Items.sort(byVolume);
+    const next = upNext(r.Items);
     if (!next) return btn('Read again', () => ctx.app.read(r.Items[0], { fromStart: true }), { color: 'orange' });
     const started = r.Items.some(b => b.UserData?.Played || b.UserData?.PlaybackPositionTicks > 0);
     return btn(started ? `Continue · ${next.Name}` : 'Start reading', () => ctx.app.read(next), { color: 'orange', title: next.Name });
@@ -795,16 +797,53 @@ async function folder(ctx, it) {
     return [...byType].map(([type, items]) => [h('h3.set-h', GROUP_LABELS[type] || type), h('div.grid', items.map(i => card(api, i)))]);
   });
   const actions = h('span.contents');
+  let kicker = it.Type === 'BoxSet' ? 'Collection' : it.Type;
+  let volumes = null;
   if (isBook) actions.append(...bookButtons(ctx, it));
   else if (it.Type === 'Folder') seriesReadButton(ctx, it).then(b => b && actions.append(b));
+  if (it.Type === 'Book') {
+    kicker = h('span', 'Book');
+    volumes = otherVolumes(ctx, it, kicker, actions);
+  }
   return h('div.view-item',
     deck(`${it.Type === 'BoxSet' ? 'Collection' : it.Type} record`, { color: 'orange', code: code(it.Id) },
-    hero(ctx, it, { kicker: it.Type === 'BoxSet' ? 'Collection' : it.Type, actions: [
+    hero(ctx, it, { kicker, actions: [
       actions,
       // Collections play in release order, like the official client.
       it.Type === 'BoxSet' ? btn('Play all', async () => ctx.app.playList(await ctx.app.playableItems(it), 0, { resume: true }), { color: 'orange' }) : null,
       // Books, as official: a Download button beside Read when the user may download.
       isBook && it.CanDownload ? btn('Download', () => download(ctx.api, [it]), { color: 'lilac', ghost: true }) : null,
       ...toggles(ctx, it), menuButton(ctx, it, { small: false, onChange: afterMenu(ctx) })].filter(Boolean) })),
-    children);
+    children, volumes);
+}
+
+/**
+ * A volume's series: the kicker links to the series folder, Next volume joins Read once this
+ * one is started or finished, and the other volumes follow, scrolled to this one.
+ */
+function otherVolumes(ctx, it, kicker, actions) {
+  const { api, signal } = ctx;
+  const body = h('div');
+  const el = deck('Volumes', { color: 'sky' }, body);
+  el.hidden = true;
+  bookSeries(api, it, { signal }).then(s => {
+    if (!s || signal.aborted) return;
+    fill(kicker, s.folder ? h('a', { href: `#/item/${s.folder.Id}`, title: 'The series' }, s.name) : s.name);
+    if (s.books.length < 2) return;
+    const ud = it.UserData || {};
+    const nb = nextVolume(s, it);
+    if (nb && (ud.Played || ud.PlaybackPositionTicks > 0)) {
+      actions.append(btn(`Next · ${nb.Name}`, () => ctx.app.read(nb), { color: 'peach', title: 'The next volume' }));
+    }
+    el.querySelector('h2').textContent = `${s.name} · ${s.books.length} volumes`;
+    // The deck names the series; the cards just say which volume.
+    const shelf = h('div.shelf', s.books.map(b => card(api, { ...b, SeriesName: null })));
+    fill(body, shelf);
+    el.hidden = false;
+    const i = s.books.findIndex(b => b.Id === it.Id);
+    const target = shelf.children[Math.max(0, i - 1)];
+    if (target) requestAnimationFrame(() => { shelf.scrollLeft = target.offsetLeft - shelf.offsetLeft; });
+    shelf.children[i]?.classList.add('current');
+  }).catch(() => {});
+  return el;
 }

@@ -8,6 +8,7 @@ import { Reporter } from '../player/report.js';
 import { RemoteZip } from './zip.js';
 import { comicEngine } from './comic.js';
 import { epubEngine } from './epub.js';
+import { bookSeries, nextVolume } from '../books.js';
 
 // zip: the book is a zip read with Range requests (whole: fetched in one go below that size).
 // PDFs bring pdf.js, which does its own ranges, only when one is opened.
@@ -139,11 +140,8 @@ export function openReader(app, item, opts = {}) {
   async function findNext() {
     if (nextBook !== undefined) return nextBook;
     nextBook = null;
-    if (!cur.ParentId) return null;
     try {
-      const r = await api.items({ parentId: cur.ParentId, includeItemTypes: 'Book', sortBy: 'SortName', fields: 'UserData', limit: 2000 });
-      const i = r.Items.findIndex(b => b.Id === cur.Id);
-      nextBook = i >= 0 ? r.Items[i + 1] || null : null;
+      nextBook = nextVolume(await bookSeries(api, cur), cur);
     } catch { /* none */ }
     return nextBook;
   }
