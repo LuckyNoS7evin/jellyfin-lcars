@@ -229,7 +229,7 @@ export function playVideo(app, item, opts = {}) {
       chapters().length > 1 ? btn([h('span', 'Chapter'), arrow('r')], nextChapter, { color: 'blue', title: 'Next chapter (Page Down)' }) : null,
       list && listIndex > 0 ? btn('Previous', playPrev, { color: 'blue', title: list[listIndex - 1].Name }) : null,
       nextEp ? btn('Next', playNext, { color: 'blue', title: nextEp.Name }) : null,
-      introIds.has(cur.Id) ? null : btn(isFav() ? '★' : '☆', toggleFav, { color: 'salmon', ghost: !isFav(), title: isFav() ? 'Remove from favourites' : 'Add to favourites' }),
+      introIds.has(cur.Id) ? null : favBtn(),
       // The volume meter sits inside the lilac bar.
       h('span.grow', volBar),
       btn(isFullscreen() ? 'Window' : 'Full screen', fullscreen, { color: 'salmon' }),
@@ -240,6 +240,14 @@ export function playVideo(app, item, opts = {}) {
 
   const userData = () => (full?.Id === cur.Id ? full.UserData : null) || cur.UserData || (cur.UserData = {});
   const isFav = () => !!userData().IsFavorite;
+  // A solid block like the rest of the row: lit salmon when a favourite, unlit otherwise.
+  const favBtn = () => {
+    const b = btn('Favourite', toggleFav, { color: 'salmon', title: isFav() ? 'Remove from favourites' : 'Add to favourites' });
+    b.classList.add('p-fav');
+    b.classList.toggle('off', !isFav());
+    b.setAttribute('aria-pressed', String(isFav()));
+    return b;
+  };
   async function toggleFav() {
     const it = cur, ud = userData(), on = !ud.IsFavorite;
     try {

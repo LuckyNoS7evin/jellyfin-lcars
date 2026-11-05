@@ -241,6 +241,7 @@ html.mpv-playing #app { visibility: hidden; }
 .p-btns .grow { flex: 1; height: 44px; background: var(--lilac); min-width: 20px; }
 .p-btns .grow.r { border-radius: 0 22px 22px 0; flex: 0 0 34px; background: var(--blue); }
 .p-btns .btn { border-radius: 0; }
+.p-btns .p-fav.off { --sc: var(--dim); color: var(--peach); }
 .p-btns .btn:first-child { border-radius: 22px 0 0 22px; }
 .p-status { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 32px; color: var(--peach); letter-spacing: .15em; pointer-events: none; text-shadow: 0 0 8px #000; }
 .p-status.blink { animation: blink 1.2s steps(2, jump-none) infinite; }
@@ -267,6 +268,8 @@ html.mpv-playing #app { visibility: hidden; }
 .p-btns .scrub.vol::after { background: repeating-linear-gradient(90deg, transparent 0 14px, var(--lilac) 14px 17px); }
 .p-btns .scrub.vol .pos { background: #000; }
 .p-btns .scrub.vol.muted .pos { background: transparent; }
+/* Narrow screens: no room for the volume bar beside the buttons (phones have volume keys). */
+@media (max-width: 700px) { .p-btns .scrub.vol { display: none; } }
 .p-time .t-end { cursor: pointer; }
 .p-time .t-end:hover { color: var(--orange); }
 
