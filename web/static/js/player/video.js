@@ -31,6 +31,7 @@ const KEYS = [
 ];
 
 const streamLabel = s => s.DisplayTitle || [s.Language, s.Codec, s.Title].filter(Boolean).join(' · ') || `Track ${s.Index}`;
+const videoLabel = s => [s.Title, s.Width && s.Height ? `${s.Width}×${s.Height}` : '', (s.Codec || '').toUpperCase()].filter(Boolean).join(' · ') || `Track ${s.Index}`;
 
 /**
  * playVideo(app, item, {resume, startTicks, audioIndex, subIndex, list, index}) -> controller.
@@ -85,6 +86,9 @@ export function playVideo(app, item, opts = {}) {
   let method = 'DirectPlay';
   let reporter = null;
   let audioIndex = opts.audioIndex;
+  // A video stream other than the file's first (angles, a second cut): the server sends it, as
+  // browsers play only the first. Undefined for the first.
+  let videoIndex = opts.videoIndex;
   // Watch together (syncplay.js): the controls ask the group instead of acting, and the group's
   // commands drive the player through ctl.local.
   let sync = opts.sync || null;
@@ -130,8 +134,12 @@ export function playVideo(app, item, opts = {}) {
     fill(titleEl, h('b', cur.Name), kicker ? h('span', String(kicker)) : '');
   }
 
+  const videoStreams = () => (ms?.MediaStreams || []).filter(s => s.Type === 'Video');
+  // The video stream playing: the one picked, or the first.
+  const vstream = () => videoStreams().find(s => s.Index === videoIndex) || videoStreams()[0];
+
   function drawInfo() {
-    const vs = ms?.MediaStreams?.find(s => s.Type === 'Video');
+    const vs = vstream();
     fill(infoEl,
       sync ? tag('Together', 'peach') : null,
       tag(method === 'DirectPlay' ? 'Direct' : 'Transcode', method === 'DirectPlay' ? 'sky' : 'salmon'),
@@ -207,10 +215,12 @@ export function playVideo(app, item, opts = {}) {
   function drawButtons() {
     const subs = ms?.MediaStreams?.filter(s => s.Type === 'Subtitle') || [];
     const auds = ms?.MediaStreams?.filter(s => s.Type === 'Audio') || [];
+    const vids = videoStreams();
     fill(btnsEl, 
       btn(eng.paused ? 'Play' : 'Pause', toggle, { color: 'orange' }),
       btn(`−${skipBack}`, () => seekBy(-skipBack), { color: 'peach', title: `Back ${skipBack} seconds` }),
       btn(`+${skipFwd}`, () => seekBy(skipFwd), { color: 'peach', title: `Forward ${skipFwd} seconds` }),
+      vids.length > 1 ? btn('Video', () => menu('video'), { color: 'sky', title: 'Video track' }) : null,
       auds.length > 1 ? btn('Audio', () => menu('audio'), { color: 'sky' }) : null,
       subs.length ? btn('Subtitles', () => menu('subs'), { color: 'sky' }) : null,
       // Only users allowed to transcode get a choice (official playersettingsmenu.js).
@@ -266,7 +276,11 @@ export function playVideo(app, item, opts = {}) {
     closeMenu();
     let title, rows, color = 'c-sky';
     const back = ['‹ Options', false, () => { menu('options'); return 'stay'; }];
-    if (kind === 'audio') {
+    if (kind === 'video') {
+      title = 'Video';
+      const vids = videoStreams();
+      rows = vids.map(s => [videoLabel(s), s === vstream(), () => switchVideo(s.Index)]);
+    } else if (kind === 'audio') {
       title = 'Audio';
       rows = ms.MediaStreams.filter(s => s.Type === 'Audio').map(s => [streamLabel(s), s.Index === audioIndex, () => switchAudio(s.Index)]);
     } else if (kind === 'subs') {
@@ -354,7 +368,7 @@ export function playVideo(app, item, opts = {}) {
         // The version picked on the title page (for that item, not its intros), then the same one on reloads.
         mediaSourceId: ms?.Id || (cur.Id === item.Id ? wantSource : undefined),
         audioIndex, subIndex,
-        directPlay: !forceTranscode,
+        directPlay: !forceTranscode && videoIndex == null,
         alwaysBurnIn: pb.alwaysBurnInWhenTranscoding,
       }), fullP]);
     } catch (e) {
@@ -368,7 +382,7 @@ export function playVideo(app, item, opts = {}) {
     if (audioIndex == null) audioIndex = ms.DefaultAudioStreamIndex;
     if (subIndex == null) subIndex = ms.DefaultSubtitleStreamIndex ?? -1;
 
-    const direct = ms.SupportsDirectPlay && !forceTranscode && !ms.TranscodingUrl;
+    const direct = ms.SupportsDirectPlay && !forceTranscode && videoIndex == null && !ms.TranscodingUrl;
     method = direct ? 'DirectPlay' : 'Transcode';
 
     // Subtitles delivered as files (not burned in), for the engine to show.
@@ -383,6 +397,7 @@ export function playVideo(app, item, opts = {}) {
     } else {
       url = api.url(ms.TranscodingUrl.replace(/^\/+/, '/'));
       if (!/[?&](api_key|ApiKey)=/i.test(url)) url += `&ApiKey=${encodeURIComponent(api.token)}`;
+      if (videoIndex != null) url = url.replace(/[?&]VideoStreamIndex=\d+/i, '') + `&VideoStreamIndex=${videoIndex}`;
     }
     await eng.load({ url, hls: !direct, direct, startAt, ms, subs, item: cur, audioIndex });
     if (token !== loadToken || closed) return;
@@ -438,6 +453,13 @@ export function playVideo(app, item, opts = {}) {
   function setSecondary(idx) {
     secIndex = idx;
     applySubs();
+  }
+
+  function switchVideo(idx) {
+    const want = idx === videoStreams()[0]?.Index ? undefined : idx;
+    if (want === videoIndex) return;
+    videoIndex = want;
+    load(position());
   }
 
   function switchAudio(idx) {
@@ -660,7 +682,7 @@ export function playVideo(app, item, opts = {}) {
 
   function drawStats() {
     if (statsEl.hidden) return;
-    const vs = ms?.MediaStreams?.find(x => x.Type === 'Video');
+    const vs = vstream();
     const as = ms?.MediaStreams?.find(x => x.Index === audioIndex);
     const ss = ms?.MediaStreams?.find(x => x.Index === subIndex);
     const ti = session?.TranscodingInfo;
@@ -817,6 +839,7 @@ export function playVideo(app, item, opts = {}) {
     resetForItem();
     ms = null;
     audioIndex = undefined;
+    videoIndex = undefined;
     subIndex = undefined;
     duration = (cur.RunTimeTicks || 0) / TICKS;
     drawTitle();

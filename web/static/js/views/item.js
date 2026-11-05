@@ -329,6 +329,8 @@ function additionalParts(ctx, it) {
 }
 
 const streamLabel = s => s.DisplayTitle || [s.Language, s.Codec].filter(Boolean).join(' · ') || `Track ${s.Index}`;
+// As official: the stream's title, or its resolution and codec.
+const videoLabel = s => [s.Title, s.Width && s.Height ? `${s.Width}×${s.Height}` : '', (s.Codec || '').toUpperCase()].filter(Boolean).join(' · ') || `Track ${s.Index}`;
 
 // ---- films and episodes -------------------------------------------------------------------
 
@@ -337,12 +339,13 @@ function videoItem(ctx, it) {
   const sources = it.MediaSources || [];
   let src = sources[0];
   const pos = it.UserData?.PlaybackPositionTicks || 0;
-  const sel = { audio: src?.DefaultAudioStreamIndex, sub: src?.DefaultSubtitleStreamIndex ?? -1 };
+  const sel = { audio: src?.DefaultAudioStreamIndex, sub: src?.DefaultSubtitleStreamIndex ?? -1, video: undefined };
 
   const picks = h('div.picks');
   const info = h('div.media-info');
   function drawPicks() {
     const streams = src?.MediaStreams || [];
+    const vids = streams.filter(s => s.Type === 'Video');
     const auds = streams.filter(s => s.Type === 'Audio');
     const subs = streams.filter(s => s.Type === 'Subtitle');
     const select = (label, opts, value, onchange) => h('label.pick', h('span', label),
@@ -353,11 +356,14 @@ function videoItem(ctx, it) {
         src = sources.find(s => s.Id === v);
         sel.audio = src.DefaultAudioStreamIndex;
         sel.sub = src.DefaultSubtitleStreamIndex ?? -1;
+        sel.video = undefined;
         drawPicks();
       }) : null,
+      // Several video streams (angles, a second cut): official lists them; here they can be played.
+      vids.length > 1 ? select('Video', vids.map(s => [s.Index, videoLabel(s)]), sel.video ?? vids[0].Index, v => { sel.video = Number(v) === vids[0].Index ? undefined : Number(v); drawPicks(); }) : null,
       auds.length ? select('Audio', auds.map(s => [s.Index, streamLabel(s)]), sel.audio, v => { sel.audio = Number(v); }) : null,
       subs.length ? select('Subtitles', [[-1, 'Off'], ...subs.map(s => [s.Index, streamLabel(s)])], sel.sub, v => { sel.sub = Number(v); }) : null);
-    const vs = streams.find(s => s.Type === 'Video');
+    const vs = vids.find(s => s.Index === sel.video) || vids[0];
     const as = streams.find(s => s.Index === sel.audio) || auds[0];
     fill(info, 
       vs ? ro('Video', `${(vs.Codec || '').toUpperCase()} ${vs.Width && vs.Height ? `${vs.Width}×${vs.Height}` : ''} ${vs.VideoRangeType && vs.VideoRangeType !== 'SDR' ? vs.VideoRangeType : ''}`.trim(), 'sky') : null,
@@ -368,7 +374,7 @@ function videoItem(ctx, it) {
   }
   drawPicks();
 
-  const play = startTicks => app.play(it, { startTicks, mediaSourceId: src?.Id, audioIndex: sel.audio, subIndex: sel.sub });
+  const play = startTicks => app.play(it, { startTicks, mediaSourceId: src?.Id, audioIndex: sel.audio, subIndex: sel.sub, videoIndex: sel.video });
   const miss = missingState(it);
   const actions = [
     miss ? missingTag(it) : null,
