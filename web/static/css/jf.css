@@ -810,3 +810,25 @@ a.np-title:hover, a.np-title:focus-visible { text-decoration: underline; outline
 .picker-o.on::before { content: "▸ "; }
 .picker-o[disabled] { opacity: .4; cursor: default; }
 
+
+/* Photo map (views/photomap.js). Tiles darkened to sit in the LCARS frame. */
+.photo-map { display: flex; flex-direction: column; gap: var(--gap); }
+.pm-bar { display: flex; align-items: center; gap: var(--gap); flex-wrap: wrap; }
+.pm-bar .btn { min-width: 52px; }
+.pm-bar .pm-z { font-size: 24px; line-height: 1; }
+.pm-count { color: var(--sky); font-size: 15px; }
+.pm-map { position: relative; height: max(340px, calc(100dvh - 470px)); overflow: hidden; background: #0b0d16; border-radius: 0 0 0 24px; touch-action: none; user-select: none; cursor: grab; outline: none; }
+.pm-map:focus-visible { box-shadow: inset 0 0 0 2px var(--sky); }
+.pm-map.drag { cursor: grabbing; }
+.pm-tiles, .pm-pins { position: absolute; inset: 0; }
+.pm-tiles { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9) saturate(.6); }
+.pm-tiles img { position: absolute; left: 0; top: 0; width: 256px; height: 256px; -webkit-user-drag: none; }
+.pm-tiles img.gone { visibility: hidden; }
+.pm-pin { position: absolute; left: -24px; top: -24px; width: 48px; height: 48px; padding: 0; border: 3px solid var(--orange); border-radius: 50%; background: var(--dim); overflow: visible; cursor: pointer; }
+.pm-pin img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+.pm-pin:hover, .pm-pin:focus-visible { border-color: var(--sky); z-index: 2; outline: none; }
+.pm-n { position: absolute; right: -10px; bottom: -6px; min-width: 24px; padding: 1px 6px; border-radius: 10px; background: var(--orange); color: #000; font-size: 13px; line-height: 16px; text-align: center; }
+.pm-status { position: absolute; left: 50%; top: 16px; transform: translateX(-50%); padding: 4px 14px; border-radius: 12px; background: #000c; color: var(--peach); font-size: 15px; pointer-events: none; }
+.pm-attr { position: absolute; right: 0; bottom: 0; padding: 1px 6px; background: #000a; font-size: 11px; text-transform: none; letter-spacing: 0; }
+.pm-attr a { color: var(--sky); }
+@media (max-width: 700px) { .pm-map { height: max(320px, calc(100dvh - 300px)); } .pm-count { width: 100%; } }

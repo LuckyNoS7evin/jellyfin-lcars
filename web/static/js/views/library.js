@@ -5,6 +5,7 @@ import { h, fill } from '../h.js';
 import { Api } from '../api.js';
 import { deck, card, empty, errorBox, loading, whenVisible, code, toast, btn } from '../ui.js';
 import { movieSuggestions, tvSuggestions, musicSuggestions, upcoming, networks, genres } from './libtabs.js';
+import { photoMap } from './photomap.js';
 import { selectAllSource } from '../select.js';
 import { newPlaylist, newCollection, canManageCollections } from '../menu.js';
 
@@ -87,6 +88,9 @@ const TYPES = {
   playlists: [{ id: 'lists', label: 'Playlists', types: 'Playlist', folders: true, create: 'playlist', sorts: ['name', 'added'], groups: [] }],
   default: [{ id: 'all', label: 'Contents', folders: true, sorts: ['name', 'added'], groups: [STATUS] }],
 };
+// Photos (and home videos, which can hold photos): the folders, and a map of where they were taken.
+TYPES.photos = [...TYPES.default, { id: 'map', label: 'Map', render: photoMap }];
+TYPES.homevideos = TYPES.photos;
 
 const PAGE = 100;
 
