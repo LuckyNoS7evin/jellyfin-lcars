@@ -6,7 +6,7 @@ ARG JELLYFIN_TAG=12.4.20261026-211555
 ARG JELLYFIN_VERSION=12.4.0
 # The HEIC Photos plugin (iPhone photos in photo libraries), built from its repo at this tag.
 ARG HEIC_PLUGIN_REPO=https://github.com/LuckyNoS7evin/jellyfin-heic-plugin.git
-ARG HEIC_PLUGIN_REF=v0.1.0.0
+ARG HEIC_PLUGIN_REF=v0.2.0.0
 
 # LCARS's files, minified as for the standalone image, written out as a web client folder.
 FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.27-alpine AS web
