@@ -169,6 +169,18 @@ const app = {
     toast(next ? 'Playing next' : 'Added to queue', list.length > 1 ? `${it.Name} · ${list.length} tracks` : it.Name, 'sky', 2200);
   },
 
+  /**
+   * May this user play media here? An administrator can turn off "Allow media playback" for a
+   * user. The server doesn't refuse the streams, it marks items PlayAccess None and leaves the
+   * rest to the client, as the official one does. Playing on another
+   * device is that device's business, and books aren't media playback.
+   */
+  mayPlay(it) {
+    if ((this.me?.Policy?.EnableMediaPlayback !== false && it?.PlayAccess !== 'None') || this.remote.active) return true;
+    toast('Playback not authorised', 'This account isn\'t allowed to play media. An administrator can allow it in Users.', 'red', 6000);
+    return false;
+  },
+
   /** Play anything: videos open the player, audio goes to the queue. */
   play(it, opts = {}) {
     if (it.MediaType === 'Audio' || it.Type === 'Audio') {
@@ -178,6 +190,7 @@ const app = {
       return;
     }
     if (it.Type === 'Book') { this.read(it, opts); return; }
+    if (!this.mayPlay(it)) return;
     // In a watch-together group a new video is the group's: ask it, and it starts everyone.
     if (this.sync?.active && !opts.fromSync && !this.remote.active) {
       this.sync.requestPlay(it, opts).catch(e => toast('Unable to comply', e.message, 'red'));
@@ -285,7 +298,8 @@ app.remote.on(() => { drawHeader(); drawRail(currentPath()); });
 const PLAYABLE_CARDS = new Set(['Movie', 'Episode', 'Video', 'MusicVideo', 'Trailer', 'Audio', 'AudioBook', 'MusicAlbum', 'MusicArtist', 'Playlist', 'Series', 'Season', 'Book']);
 setCardHooks({
   selectable,
-  canPlay: it => PLAYABLE_CARDS.has(it.Type) && it.LocationType !== 'Virtual' && !it.IsPlaceHolder,
+  canPlay: it => PLAYABLE_CARDS.has(it.Type) && it.LocationType !== 'Virtual' && !it.IsPlaceHolder
+    && (it.Type === 'Book' || (app.me?.Policy?.EnableMediaPlayback !== false && it.PlayAccess !== 'None') || app.remote.active),
   play: it => app.playItem(it),
   menu: (it, anchor, onChange) => openItemMenu({ api: app.api, app }, it, anchor, onChange),
 });

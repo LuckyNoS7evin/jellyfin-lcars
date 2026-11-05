@@ -80,6 +80,7 @@ export class AudioQueue {
    * (shuffle: true); the shuffle toggle then works on that queue.
    */
   play(items, index = 0, { shuffle = false, startTicks = 0 } = {}) {
+    if (!this.app.mayPlay?.(items[index])) return;
     // Playing on another device (remote.js): it gets the tracks instead.
     if (this.app.remote?.active) { this.app.remote.play(items.filter(isAudio), { index, shuffle, startTicks }); return; }
     const list = items.filter(isAudio).map(entry);
@@ -100,6 +101,7 @@ export class AudioQueue {
   }
 
   add(items) {
+    if (!this.app.mayPlay?.()) return;
     if (this.app.remote?.active) { this.app.remote.play(items.filter(isAudio), { command: 'PlayLast' }); return; }
     const list = items.filter(isAudio).map(entry);
     if (!this.active) { this.play(list); return; }
@@ -110,6 +112,7 @@ export class AudioQueue {
 
   /** Insert after the current track ("Play next"). */
   playNext(items) {
+    if (!this.app.mayPlay?.()) return;
     if (this.app.remote?.active) { this.app.remote.play(items.filter(isAudio), { command: 'PlayNext' }); return; }
     const list = items.filter(isAudio).map(entry);
     if (!this.active) { this.play(list); return; }

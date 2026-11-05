@@ -86,7 +86,13 @@ export async function playbackInfo(api, itemId, { profile, maxBitrate, mediaSour
     AutoOpenLiveStream: true,
     AlwaysBurnInSubtitleWhenTranscoding: alwaysBurnIn,
   }, undefined, { signal });
-  if (r.ErrorCode) throw new Error(`Playback refused: ${r.ErrorCode}`);
+  if (r.ErrorCode) {
+    throw new Error({
+      NotAllowed: 'This account isn\'t allowed to play this. An administrator can change it in Users.',
+      NoCompatibleStream: 'No stream this device can play, and the server can\'t convert it (transcoding may be off for this account).',
+      RateLimitExceeded: 'Too many streams at once for this account.',
+    }[r.ErrorCode] || `Playback refused: ${r.ErrorCode}`);
+  }
   const ms = (mediaSourceId && r.MediaSources.find(m => m.Id === mediaSourceId)) || r.MediaSources[0];
   if (!ms) throw new Error('No playable media source');
   return { ms, playSessionId: r.PlaySessionId };
