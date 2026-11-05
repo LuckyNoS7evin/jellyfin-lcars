@@ -5,7 +5,7 @@ import { Api, connectSocket, store, TICKS, CLIENT } from './api.js';
 import * as f from './fmt.js';
 import { btn, arrow, colorAt, toast, canMarkPlayed, canRate, canRefreshMetadata, loading, errorBox, pickImage, image, setCardHooks, volumeBar, applyUserData } from './ui.js';
 import { openItemMenu, addToPlaylist, addToCollection, canManageCollections, COLLECTABLE, refreshDialog, confirmDialog } from './menu.js';
-import { selectable, addSelectAction, clearSelection } from './select.js';
+import { selectable, addSelectAction, clearSelection, itemOfCard } from './select.js';
 import { startSound } from './sound.js';
 import { UserSettings } from './settings.js';
 import { AudioQueue } from './player/audio.js';
@@ -206,6 +206,14 @@ const app = {
     stopTheme();
     this.player?.close();
     this.player = openReader(this, it, opts);
+    drawHeader();
+  },
+
+  /** Photos in the viewer (loaded on first use), from items[index]. Music keeps playing. */
+  async viewPhotos(items, index = 0) {
+    const { openPhotos } = await import('./photos.js');
+    this.player?.close();
+    this.player = openPhotos(this, items, index);
     drawHeader();
   },
 
@@ -1023,6 +1031,18 @@ app.mediaKey = what => {
   else if (what === 'previous' || what === 'rewind') q.prev();
 };
 tvSetup(app, { canGoBack: () => canGoBack(currentPath()), goBack });
+// A photo's card opens the viewer, stepping through the photos beside it (the album, the page,
+// the search results) rather than going to a page of its own.
+document.addEventListener('click', e => {
+  if (e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  const a = e.target.closest?.('.card a.card-link, .card a.card-cap');
+  const card = a?.closest('.card');
+  const it = card && itemOfCard(card);
+  if (it?.Type !== 'Photo') return;
+  e.preventDefault();
+  const items = [...card.parentElement.children].map(itemOfCard).filter(x => x?.Type === 'Photo');
+  app.viewPhotos(items, Math.max(0, items.findIndex(x => x.Id === it.Id)));
+});
 // Inside the iPhone app, links that open a new tab do nothing; its own browser opens them.
 document.addEventListener('click', e => {
   const a = e.target.closest?.('a[href][target=_blank]');

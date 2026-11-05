@@ -577,6 +577,28 @@ a.card-t:hover, a.card-s:hover, a.card-t:focus-visible, a.card-s:focus-visible {
   .reader .p-btns .btn { min-width: 0; }
 }
 
+/* ---- photo viewer (photos.js) ------------------------------------------------------------------ */
+.photos .ph-stage { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; overflow: hidden; user-select: none; touch-action: pinch-zoom; }
+.photos .ph-stage img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; -webkit-user-drag: none; }
+/* Zoomed: the picture at its own size, scrolled to look around (centred while it fits). */
+.photos .ph-stage.zoom { overflow: auto; justify-content: flex-start; align-items: flex-start; touch-action: auto; scrollbar-width: thin; }
+.photos .ph-stage.zoom img { max-width: none; max-height: none; margin: auto; flex: none; }
+.photos.idle { cursor: default; }
+.photos .p-btns .btn { min-width: 52px; }
+.ph-info { position: absolute; right: 18px; top: 110px; z-index: 2; width: min(380px, calc(100vw - 36px)); max-height: calc(100% - 270px); overflow-y: auto;
+  background: #000d; border-left: 14px solid var(--sky); border-radius: 0 24px 24px 0; padding: 12px 18px; scrollbar-width: thin; }
+.ph-info[hidden] { display: none; }
+.ph-info h3 { color: var(--sky); font-size: 22px; margin: 0 0 8px; }
+.ph-info p { color: var(--peach); margin: 0; }
+.ph-info dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; font-size: 17px; }
+.ph-info dt { color: var(--sky); text-transform: uppercase; }
+.ph-info dd { margin: 0; color: var(--peach); overflow-wrap: anywhere; }
+.ph-info a { color: var(--orange); }
+@media (max-width: 760px) {
+  .photos .p-btns .btn { min-width: 0; }
+  .ph-info { top: auto; bottom: 170px; max-height: 45%; }
+}
+
 /* ---- music queue controls --------------------------------------------------------------------- */
 .qtrk { grid-template-columns: 3em minmax(0, 1fr) minmax(0, .6fr) 4.5em auto; }
 .qtrk.dragging { opacity: .45; }

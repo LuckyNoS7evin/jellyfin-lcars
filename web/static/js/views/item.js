@@ -32,6 +32,14 @@ export async function item(ctx) {
   if (it.Type === 'CollectionFolder' || it.Type === 'UserView') { location.replace(`#/lib/${it.Id}`); return h('div'); }
   ctx.setTitle(it.Type === 'Episode' ? it.SeriesName : it.Name);
   ctx.setParent(parentOf(it));
+  // A photo's own address (a link, a remote's DisplayContent): its album, with the photo open over it.
+  if (it.Type === 'Photo' && it.ParentId) {
+    api.items({ parentId: it.ParentId, includeItemTypes: 'Photo', sortBy: 'SortName' })
+      .then(r => ctx.app.viewPhotos(r.Items?.length ? r.Items : [it], Math.max(0, (r.Items || []).findIndex(p => p.Id === it.Id))))
+      .catch(() => ctx.app.viewPhotos([it]));
+    location.replace(`#/item/${it.ParentId}`);
+    return h('div');
+  }
   if (VIDEO_TYPES.has(it.Type)) return videoItem(ctx, it);
   switch (it.Type) {
     case 'Series': return series(ctx, it);

@@ -12,6 +12,7 @@ const GROUPS = [
   ['Collections', 'BoxSet', 'peach'], ['Playlists', 'Playlist', 'blue', 'square'],
   ['Artists', 'MusicArtist', 'blue', 'square'], ['Albums', 'MusicAlbum', 'salmon', 'square'], ['Songs', 'Audio', 'sky', 'square'],
   ['Books', 'Book', 'orange'], ['Audiobooks', 'AudioBook', 'lilac', 'square'],
+  ['Photo albums', 'PhotoAlbum', 'sky'], ['Photos', 'Photo', 'peach', 'square'],
   ['People', 'Person', 'lilac'],
 ];
 const ITEM_TYPES = GROUPS.map(g => g[1]).filter(t => t !== 'Person').join(',');

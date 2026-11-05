@@ -40,6 +40,8 @@ export function selectAllSource(grid, src) { sources.set(grid, src); }
 export const isSelecting = () => selected.size > 0;
 export const isSelected = id => selected.has(id);
 export const selectedItems = () => [...selected.values()];
+/** The item a card shows (cards made by card()). */
+export const itemOfCard = card => cardItem.get(card);
 
 /** Called by card(): remember which item a card shows, and give it its select button. */
 export function selectable(card, item) {
