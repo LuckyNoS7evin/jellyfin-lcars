@@ -818,7 +818,10 @@ a.np-title:hover, a.np-title:focus-visible { text-decoration: underline; outline
 .photo-map { display: flex; flex-direction: column; gap: var(--gap); }
 .pm-bar { display: flex; align-items: center; gap: var(--gap); flex-wrap: wrap; }
 .pm-bar .btn { min-width: 52px; }
-.pm-bar .pm-z { font-size: 24px; line-height: 1; }
+.pm-bar .pm-z { justify-content: center; }
+.pm-sym { position: relative; width: 16px; height: 16px; }
+.pm-sym::before, .pm-sym.plus::after { content: ""; position: absolute; left: 0; top: 6px; width: 16px; height: 4px; border-radius: 2px; background: #000; }
+.pm-sym.plus::after { transform: rotate(90deg); }
 .pm-count { color: var(--sky); font-size: 15px; }
 .pm-map { position: relative; height: max(340px, calc(100dvh - 470px)); overflow: hidden; background: #0b0d16; border-radius: 0 0 0 24px; touch-action: none; user-select: none; cursor: grab; outline: none; }
 .pm-map:focus-visible { box-shadow: inset 0 0 0 2px var(--sky); }

@@ -86,13 +86,19 @@ export function photoMap(ctx, view) {
     tiles, pins, status,
     h('div.pm-attr', h('a', { href: 'https://www.openstreetmap.org/copyright', target: '_blank', rel: 'noopener' }, '© OpenStreetMap contributors')));
   const bar = h('div.pm-bar',
-    zoomBtn('+', 1, 'Zoom in (+)'),
-    zoomBtn('−', -1, 'Zoom out (−)'),
+    zoomBtn('plus', 1, 'Zoom in (+)'),
+    zoomBtn('minus', -1, 'Zoom out (−)'),
     btn('All', () => fit(points), { color: 'lilac', small: true, title: 'Show every photo' }),
     btn('View', () => viewInSight(), { color: 'orange', small: true, title: 'Open the photos in sight in the viewer' }),
     h('span.grow'), count);
   const root = h('div.photo-map', bar, surface);
-  function zoomBtn(label, dz, title) { const b = btn(label, () => zoomBy(dz), { color: 'sky', small: true, title }); b.classList.add('pm-z'); return b; }
+  // + and − drawn in CSS: the font's are small and sit low.
+  function zoomBtn(sym, dz, title) {
+    const b = btn(h('span.pm-sym', { class: sym, attrs: { 'aria-hidden': 'true' } }), () => zoomBy(dz), { color: 'sky', small: true, title });
+    b.classList.add('pm-z');
+    b.setAttribute('aria-label', title);
+    return b;
+  }
 
   const size = () => ({ w: surface.clientWidth || 800, h: surface.clientHeight || 500 });
   const world = () => TILE * 2 ** z;
