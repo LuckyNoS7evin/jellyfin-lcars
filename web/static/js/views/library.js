@@ -6,6 +6,7 @@ import { Api } from '../api.js';
 import { deck, card, empty, errorBox, loading, whenVisible, code, toast, btn } from '../ui.js';
 import { movieSuggestions, tvSuggestions, musicSuggestions, upcoming, networks, genres } from './libtabs.js';
 import { selectAllSource } from '../select.js';
+import { newPlaylist, newCollection, canManageCollections } from '../menu.js';
 
 // key -> [label, SortBy]
 const SORTS = {
@@ -57,7 +58,7 @@ const TYPES = {
     { id: 'films', landing: 'movies', label: 'Films', types: 'Movie', pref: 'movies', sorts: VIDEO_SORTS, groups: [STATUS, FEATURES, VIDEO], dynamic: true },
     { id: 'suggestions', landing: 'suggestions', label: 'Suggestions', render: movieSuggestions },
     { id: 'favourites', landing: 'favorites', label: 'Favourites', types: 'Movie', fixed: { filters: 'IsFavorite' }, sorts: VIDEO_SORTS, groups: [FEATURES, VIDEO] },
-    { id: 'collections', landing: 'collections', label: 'Collections', types: 'BoxSet', pref: 'moviecollections', sorts: ['name', 'added', 'released', 'random'], groups: [STATUS] },
+    { id: 'collections', landing: 'collections', label: 'Collections', types: 'BoxSet', pref: 'moviecollections', create: 'collection', sorts: ['name', 'added', 'released', 'random'], groups: [STATUS] },
     { id: 'genres', landing: 'genres', label: 'Genres', render: (ctx, view) => genres(ctx, view, 'Movie') },
   ],
   tvshows: [
@@ -73,17 +74,17 @@ const TYPES = {
     { id: 'suggestions', landing: 'suggestions', label: 'Suggestions', render: musicSuggestions },
     { id: 'artists', landing: 'albumartists', label: 'Album artists', artists: '/Artists/AlbumArtists', sorts: ['name'], groups: [] },
     { id: 'allartists', landing: 'artists', label: 'Artists', artists: '/Artists', sorts: ['name'], groups: [] },
-    { id: 'playlists', landing: 'playlists', label: 'Playlists', types: 'Playlist', noParent: true, fixed: { mediaTypes: 'Audio' }, sorts: ['name', 'added'], groups: [] },
+    { id: 'playlists', landing: 'playlists', label: 'Playlists', types: 'Playlist', noParent: true, fixed: { mediaTypes: 'Audio' }, create: 'audio', sorts: ['name', 'added'], groups: [] },
     { id: 'songs', landing: 'songs', label: 'Songs', types: 'Audio', pref: 'songs', sorts: ['name', 'artist', 'album', 'added', 'played', 'playCount', 'runtime', 'random'], groups: [STATUS] },
     { id: 'genres', landing: 'genres', label: 'Genres', render: (ctx, view) => genres(ctx, view, 'MusicAlbum') },
   ],
-  boxsets: [{ id: 'sets', label: 'Collections', types: 'BoxSet', pref: 'boxsets', sorts: ['name', 'added', 'released', 'random'], groups: [STATUS] }],
+  boxsets: [{ id: 'sets', label: 'Collections', types: 'BoxSet', pref: 'boxsets', create: 'collection', sorts: ['name', 'added', 'released', 'random'], groups: [STATUS] }],
   // Books libraries are folders of series; browse those like the official client.
   books: [
     { id: 'series', label: 'Series', folders: true, sorts: ['name', 'added'], groups: [STATUS] },
     { id: 'books', label: 'All books', types: 'Book,AudioBook', pref: 'books', sorts: ['name', 'added', 'released', 'year', 'random'], groups: [STATUS], dynamic: true },
   ],
-  playlists: [{ id: 'lists', label: 'Playlists', types: 'Playlist', folders: true, sorts: ['name', 'added'], groups: [] }],
+  playlists: [{ id: 'lists', label: 'Playlists', types: 'Playlist', folders: true, create: 'playlist', sorts: ['name', 'added'], groups: [] }],
   default: [{ id: 'all', label: 'Contents', folders: true, sorts: ['name', 'added'], groups: [STATUS] }],
 };
 
@@ -372,7 +373,11 @@ export async function library(ctx) {
 
   // On a phone the controls fold into an Options panel behind one summary line: the sort, Filters
   // and the count (css/jf.css). Opening it from Filters opens the filters too.
+  // New collection (for those allowed to manage them) and New playlist, as official.
+  const newBtn = tab.create === 'collection' ? (canManageCollections(app.me) ? btn('New collection', () => newCollection(ctx), { small: true, color: 'sky' }) : null)
+    : tab.create ? btn('New playlist', () => newPlaylist(ctx, { mediaType: tab.create === 'audio' ? 'Audio' : undefined }), { small: true, color: 'sky' }) : null;
   const opts = h('div.tabs.lib-opts',
+      newBtn,
       playBtns,
       tab.sorts.length > 1 ? [h('span.lbl', 'Sort'), sortSel, sort !== 'random' ? orderBtn : null] : null,
       filterBtn,

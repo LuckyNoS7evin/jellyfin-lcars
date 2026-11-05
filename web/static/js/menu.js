@@ -226,6 +226,55 @@ export async function addToPlaylist(ctx, items, { label, title = 'Add to playlis
   } catch (e) { fill(body, errorBox(e)); }
 }
 
+/**
+ * A new, empty playlist or collection from its tab's button (official NewPlaylistButton and
+ * moviecollections' btnNewCollection), then open it. The server makes an empty playlist a music
+ * one, so where it could be either the dialog asks; the first of either also adds its library.
+ */
+export function newPlaylist(ctx, { mediaType } = {}) {
+  const { api } = ctx;
+  const nameIn = h('input.inp', { placeholder: 'Name', attrs: { 'aria-label': 'Playlist name' } });
+  const kind = mediaType ? null : h('select.sel', { attrs: { 'aria-label': 'Playlist of' } },
+    h('option', { value: 'Audio' }, 'Music'), h('option', { value: 'Video' }, 'Videos'));
+  const pub = h('input', { type: 'checkbox' });
+  const create = () => createAndOpen(ctx, d, nameIn, 'Playlist',
+    name => api.post('/Playlists', { Name: name, UserId: api.userId, MediaType: mediaType || kind.value, IsPublic: pub.checked }));
+  const d = dialog('New playlist', [
+    h('form', { onsubmit: e => { e.preventDefault(); create(); } }, nameIn),
+    kind ? h('div.dlg-new', h('span.lbl', 'Holds'), kind) : null,
+    h('label.dlg-check', pub, h('span', 'Public: anyone signed in can play it')),
+  ], [btn('Create', create, { color: 'sky' }), btn('Cancel', () => d.close(), { color: 'lilac', ghost: true })], { color: 'sky' });
+  nameIn.focus();
+}
+
+export function newCollection(ctx) {
+  const { api } = ctx;
+  const nameIn = h('input.inp', { placeholder: 'Name', attrs: { 'aria-label': 'Collection name' } });
+  const create = () => createAndOpen(ctx, d, nameIn, 'Collection',
+    name => api.post('/Collections', undefined, { name, isLocked: false }));
+  const d = dialog('New collection', [
+    h('form', { onsubmit: e => { e.preventDefault(); create(); } }, nameIn),
+    h('p.dlg-text', 'Add films and shows to it from their ⋯ menu, or pick several and use Add to collection.'),
+  ], [btn('Create', create, { color: 'sky' }), btn('Cancel', () => d.close(), { color: 'lilac', ghost: true })], { color: 'sky' });
+  nameIn.focus();
+}
+
+let creating = false;
+async function createAndOpen({ app }, d, nameIn, what, post) {
+  const name = nameIn.value.trim();
+  if (!name) { nameIn.focus(); return; }
+  if (creating) return;
+  creating = true;
+  try {
+    const r = await post(name);
+    d.close();
+    toast(`${what} created`, name, 'sky');
+    app.reloadViews?.().catch(() => {});
+    if (r?.Id) location.hash = `#/item/${r.Id}`;
+  } catch (e) { toast('Unable to comply', e.message, 'red'); }
+  finally { creating = false; }
+}
+
 /** Refresh metadata, with the official dialog's modes and options. */
 /** Collection changes need EnableCollectionManagement (server policy CollectionManagement; being an admin isn't enough). */
 export const canManageCollections = me => !!me?.Policy?.EnableCollectionManagement;
