@@ -12,6 +12,8 @@ const fmtDate = iso => {
   return d && !isNaN(d) ? d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '';
 };
 
+// Jellyfin keeps the EXIF aperture value (APEX), not the f-number: f = 2^(value/2).
+const fNumber = av => (av > 0 ? `f/${(2 ** (av / 2)).toFixed(1).replace(/\.0$/, '')}` : '');
 const ext = p => (p.Path || '').match(/\.(\w+)$/)?.[1]?.toUpperCase() || '';
 
 /** openPhotos(app, items, index) -> controller. items: Photo items, in order. */
@@ -113,7 +115,7 @@ export function openPhotos(app, items, index = 0) {
       ['Added', fmtDate(d.DateCreated)],
       ['Size', d.Width && d.Height ? `${d.Width} × ${d.Height}` : ''],
       ['Camera', camera],
-      ['Settings', [d.FNumber && `f/${d.FNumber}`, exp, d.IsoSpeedRating && `ISO ${d.IsoSpeedRating}`, d.FocalLength && `${d.FocalLength} mm`].filter(Boolean).join(' · ')],
+      ['Settings', [fNumber(d.Aperture), exp, d.IsoSpeedRating && `ISO ${d.IsoSpeedRating}`, d.FocalLength && `${d.FocalLength} mm`].filter(Boolean).join(' · ')],
       ['Place', where],
       ['File', (d.Path || '').split('/').pop()],
     ].filter(([, v]) => v);
