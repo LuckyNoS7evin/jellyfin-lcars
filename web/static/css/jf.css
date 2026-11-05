@@ -540,6 +540,14 @@ a.card-t:hover, a.card-s:hover, a.card-t:focus-visible, a.card-s:focus-visible {
 .ov-btn:hover, .ov-btn:focus-visible { background: var(--lilac); color: #000; outline: none; }
 .ov-btn.on { background: var(--sky); color: #000; }
 .ov-btn.fav.on { background: var(--salmon); }
+/* The heart is drawn (an outline, filled when a favourite): the font's ♥ sat low and to one side. */
+.ov-btn.fav { display: inline-flex; align-items: center; justify-content: center; }
+.ov-heart { width: 14px; height: 14px; background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21s-7.5-4.6-9.6-9.2C.9 8.4 2.7 4.5 6.4 4.1c2.2-.2 4.1 1 5.6 3 1.5-2 3.4-3.2 5.6-3 3.7.4 5.5 4.3 4 7.7C19.5 16.4 12 21 12 21z' fill='none' stroke='%23000' stroke-width='2.6' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21s-7.5-4.6-9.6-9.2C.9 8.4 2.7 4.5 6.4 4.1c2.2-.2 4.1 1 5.6 3 1.5-2 3.4-3.2 5.6-3 3.7.4 5.5 4.3 4 7.7C19.5 16.4 12 21 12 21z' fill='none' stroke='%23000' stroke-width='2.6' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; }
+.ov-btn.fav.on .ov-heart {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21s-7.5-4.6-9.6-9.2C.9 8.4 2.7 4.5 6.4 4.1c2.2-.2 4.1 1 5.6 3 1.5-2 3.4-3.2 5.6-3 3.7.4 5.5 4.3 4 7.7C19.5 16.4 12 21 12 21z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21s-7.5-4.6-9.6-9.2C.9 8.4 2.7 4.5 6.4 4.1c2.2-.2 4.1 1 5.6 3 1.5-2 3.4-3.2 5.6-3 3.7.4 5.5 4.3 4 7.7C19.5 16.4 12 21 12 21z'/%3E%3C/svg%3E"); }
 .ov-more { letter-spacing: 0; }
 /* a series/season badge sits top right; keep the overlay's buttons clear of it */
 .card-pic .badge { z-index: 0; }

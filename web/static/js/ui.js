@@ -315,7 +315,7 @@ function cardOverlay(api, item, opts, self) {
       type: 'button', class: ud.IsFavorite ? 'on' : '', title: ud.IsFavorite ? 'Remove favourite' : 'Add to favourites',
       attrs: { 'aria-pressed': String(!!ud.IsFavorite) },
       onclick: act(async () => { Object.assign(ud, await api.setFavorite(item.Id, !ud.IsFavorite) || { IsFavorite: !ud.IsFavorite }); redraw(); }),
-    }, ud.IsFavorite ? '♥' : '♡')
+    }, h('span.ov-heart', { attrs: { 'aria-hidden': 'true' } }))
     : null;
   const more = h('button.ov-btn.ov-more', {
     type: 'button', title: 'More options', attrs: { 'aria-haspopup': 'menu' },
