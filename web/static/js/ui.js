@@ -213,6 +213,8 @@ function cardText(item, shape) {
   if (item.Type === 'Season') return [item.Name, item.ChildCount ? `${item.ChildCount} episodes` : item.SeriesName || ''];
   if (item.Type === 'BoxSet') return [item.Name, item.ChildCount ? `${item.ChildCount} titles` : years(item)];
   if (item.Type === 'Folder') return [item.Name, item.ChildCount ? `${item.ChildCount} items` : ''];
+  // Volumes with a series tag (ComicInfo): the series first, then "Volume 1".
+  if (item.Type === 'Book' && item.SeriesName && item.SeriesName !== item.Name) return [item.SeriesName, item.Name];
   return [item.Name, years(item)];
 }
 
