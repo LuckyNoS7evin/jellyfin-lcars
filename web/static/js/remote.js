@@ -54,7 +54,8 @@ export class Remote {
   update(list, { full = false } = {}) {
     // A steady order (name, then device id), so rows don't swap places between refreshes.
     if (full) {
-      this.sessions = list.filter(s => s.DeviceId !== this.api.deviceId && s.SupportsRemoteControl)
+      // Jellyfin's Cast receiver signs in as a session but takes commands only over Cast (cast.js).
+      this.sessions = list.filter(s => s.DeviceId !== this.api.deviceId && s.SupportsRemoteControl && s.Client !== 'Chromecast')
         .sort((a, b) => deviceLabel(a).localeCompare(deviceLabel(b)) || a.DeviceId.localeCompare(b.DeviceId));
     }
     else {
@@ -63,7 +64,7 @@ export class Remote {
       const byDevice = new Map(list.map(s => [s.DeviceId, s]));
       this.sessions = this.sessions.map(s => byId.get(s.Id) || byDevice.get(s.DeviceId)).filter(Boolean);
     }
-    if (this.target) {
+    if (this.target && !this.target.IsCast) {
       const s = list.find(x => x.Id === this.target.Id) || list.find(x => x.DeviceId === this.target.DeviceId);
       if (s) {
         this.target = s;
@@ -103,19 +104,23 @@ export class Remote {
   }
 
   connect(session, { quiet = false } = {}) {
+    if (this.target?.IsCast && this.target !== session) this.app.cast.stop();
     // Stop playing here: from now on the other device plays.
     this.app.player?.kind === 'video' && this.app.player.close();
     this.app.queue.active && this.app.queue.pause();
     this.target = session;
     this.seenAt = Date.now();
     this.missingSince = 0;
-    try { sessionStorage.setItem(KEY, session.DeviceId); } catch { /* blocked */ }
+    // A cast comes back by itself after a reload (Cast's own auto-join), so only sessions are kept.
+    if (session.IsCast) this.forget();
+    else try { sessionStorage.setItem(KEY, session.DeviceId); } catch { /* blocked */ }
     this.subscribe();
     if (!quiet) toast('Playing on', this.name, 'lilac', 2500);
     this.emit();
   }
 
   disconnect() {
+    if (this.target?.IsCast) this.app.cast.stop();
     this.target = null;
     this.forget();
     this.subscribe();
@@ -154,13 +159,21 @@ export class Remote {
     }
     // The URL has to stay a sensible length; a TV won't take a 1000-track album at once anyway.
     if (ids.length > 200) { const from = Math.max(0, Math.min(index, ids.length - 200)); ids = ids.slice(from, from + 200); index -= from; }
+    const what = items.length === 1 ? (items[0].Name || '') : `${items.length} items`;
+    const sent = () => toast(command === 'PlayNext' ? 'Playing next' : command === 'PlayLast' ? 'Added to queue' : 'Sent', `${what} → ${this.name}`, 'lilac', 2500);
+    if (this.target.IsCast) {
+      // The receiver expands folders itself, so it gets the items (in the shuffled order), not just ids.
+      const byId = new Map(items.filter(i => i.Id).map(i => [i.Id, i]));
+      this.app.cast.play(ids.map(id => byId.get(id) || id), { command, index, startTicks, mediaSourceId, audioIndex, subIndex });
+      sent();
+      return;
+    }
     try {
       await this.api.post(`/Sessions/${this.target.Id}/Playing`, undefined, {
         playCommand: command, itemIds: ids, startIndex: index || undefined, startPositionTicks: startTicks || undefined,
         mediaSourceId, audioStreamIndex: audioIndex, subtitleStreamIndex: subIndex,
       });
-      const what = items.length === 1 ? (items[0].Name || '') : `${items.length} items`;
-      toast(command === 'PlayNext' ? 'Playing next' : command === 'PlayLast' ? 'Added to queue' : 'Sent', `${what} → ${this.name}`, 'lilac', 2500);
+      sent();
     } catch (e) { this.failed(e); }
   }
 
@@ -172,6 +185,7 @@ export class Remote {
       this.seenAt = Date.now();
       this.emit();
     }
+    if (this.target.IsCast) { this.app.cast.state(cmd, seconds); return; }
     try {
       await this.api.post(`/Sessions/${this.target.Id}/Playing/${cmd}`, undefined,
         cmd === 'Seek' ? { seekPositionTicks: Math.round(seconds * TICKS) } : undefined);
@@ -183,6 +197,7 @@ export class Remote {
   /** A GeneralCommand (SetVolume, SetAudioStreamIndex, ToggleFullscreen...). Arguments are strings. */
   async command(name, args) {
     if (!this.target) return;
+    if (this.target.IsCast) { this.app.cast.command(name, args); return; }
     const Arguments = args ? Object.fromEntries(Object.entries(args).map(([k, v]) => [k, String(v)])) : undefined;
     try { await this.api.post(`/Sessions/${this.target.Id}/Command`, { Name: name, Arguments }); } catch (e) { this.failed(e); }
   }

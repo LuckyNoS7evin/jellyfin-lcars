@@ -50,7 +50,9 @@ func (s *Server) Handler() http.Handler {
 // 'wasm-unsafe-eval' lets the subtitle renderers (libass, libbitsub) compile WebAssembly;
 // it does not allow eval() of JavaScript.
 // frame-src youtube-nocookie.com: remote (YouTube) trailers play in YouTube's own player, framed.
-const csp = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob: https:; " +
+// script-src www.gstatic.com: Google's Cast sender script (cast.js), loaded only on secure pages in Chrome.
+// No scheme: it loads its parts with the page's own (https on a real server; http on localhost).
+const csp = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval' www.gstatic.com; style-src 'self'; img-src 'self' data: blob: https:; " +
 	"media-src 'self' blob:; worker-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-src 'self' https://www.youtube-nocookie.com; " +
 	"manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 

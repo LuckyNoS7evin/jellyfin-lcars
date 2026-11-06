@@ -26,6 +26,7 @@ import { tvSetup } from './tv.js';
 import { remote as remoteView } from './views/remote.js';
 import { quickConnect } from './views/quickconnect.js';
 import { Remote } from './remote.js';
+import { Cast } from './cast.js';
 import { SyncPlay } from './syncplay.js';
 import { useLcarsPicker } from './picker.js';
 import { together as togetherView } from './views/together.js';
@@ -304,6 +305,7 @@ const app = {
 };
 app.queue = new AudioQueue(app);
 app.remote = new Remote(app);
+app.cast = new Cast(app);
 app.remote.on(() => { drawHeader(); drawRail(currentPath()); });
 
 // Cards: what their ▶ can play, and the ⋯ menu.
@@ -1098,6 +1100,7 @@ async function start() {
   }
   connect();
   app.remote.restore();
+  app.cast.init();
   route();
 }
 

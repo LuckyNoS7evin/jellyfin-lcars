@@ -44,14 +44,37 @@ export async function remote(ctx) {
         supports(s, 'DisplayMessage') ? btn('Message', () => askMessage(s), { color: 'sky', small: true, ghost: true }) : null));
   }
 
+  // Google Cast (cast.js): Chrome's own dialog picks the device, so one row stands for them all.
+  function castRow() {
+    const c = app.cast;
+    if (c.status === 'unsupported') return null;
+    if (c.active) {
+      return h('div.dev.on', { key: 'cast' },
+        h('div.dev-n', h('b', r.name), h('span', 'Google Cast')),
+        h('div.dev-s', r.target.NowPlayingItem ? [r.target.PlayState?.IsPaused ? 'Paused: ' : 'Playing: ', h('b', r.target.NowPlayingItem.Name)] : 'Casting'),
+        h('div.dev-b', btn('Stop casting', () => r.disconnect(), { color: 'red', small: true, ghost: true })));
+    }
+    const note = {
+      insecure: 'Needs LCARS on HTTPS',
+      loading: 'Looking for devices…',
+      none: 'No Cast devices found on this network',
+      failed: 'Cast didn’t start in this browser',
+      available: 'Chromecast, Google TV, Cast speakers',
+    }[c.status];
+    return h('div.dev', { key: 'cast' },
+      h('div.dev-n', h('b', 'Google Cast'), h('span', 'Jellyfin receiver')),
+      h('div.dev-s', note || ''),
+      h('div.dev-b', c.status === 'available' ? btn('Cast…', () => c.start(), { color: 'lilac', small: true }) : null));
+  }
+
   function drawList() {
     const here = h('div.dev', { class: r.active ? '' : 'on', key: 'here' },
       h('div.dev-n', h('b', 'This device'), h('span', api.device)),
       h('div.dev-s', r.active ? '' : 'Playing here'),
       h('div.dev-b', r.active ? btn('Play here', () => r.disconnect(), { color: 'orange', small: true }) : null));
     fill(listBody,
-      h('div.devs', here, r.sessions.map(deviceRow)),
-      r.sessions.length ? null : empty('No other devices are signed in. Open a Jellyfin app on the TV or phone and it appears here.'),
+      h('div.devs', here, castRow(), r.sessions.map(deviceRow)),
+      r.sessions.length || app.cast.active || app.cast.status === 'available' ? null : empty('No other devices are signed in. Open a Jellyfin app on the TV or phone and it appears here.'),
       h('p.dlg-note', 'Devices signed in as you, or anyone if your account may control other users’ sessions.'));
   }
 
