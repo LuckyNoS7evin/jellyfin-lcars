@@ -15,6 +15,9 @@ import { toast } from './ui.js';
 const SDK = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=0';
 const NS = 'urn:x-cast:com.connectsdk';
 const STABLE = 'F007D354'; // Jellyfin's stable receiver, the server's default
+// Chrome refuses Cast messages much over this ("message length over limit"; 34 KB was refused),
+// so long queues go in parts of about this many bytes of items.
+const PART = 12000;
 
 // What the receiver does itself; volume and mute are the device's, set from here.
 const COMMANDS = ['SetVolume', 'ToggleMute', 'SetAudioStreamIndex', 'SetSubtitleStreamIndex', 'SetRepeatMode'];
@@ -180,7 +183,11 @@ export class Cast {
     });
   }
 
-  /** PlayNow, PlayNext or PlayLast. The receiver fetches the items; it needs to know folders. */
+  /**
+   * PlayNow, PlayNext or PlayLast. The receiver looks each item up by Id when it plays it, so
+   * only the first needs its type (a folder, artist or playlist it expands); the rest are just
+   * Ids. A long list goes in parts: the first plays, the rest are added to the receiver's queue.
+   */
   play(items, { command = 'PlayNow', index = 0, startTicks, mediaSourceId, audioIndex, subIndex } = {}) {
     // Nothing comes back when the device can't reach the server; say so rather than sit silent.
     clearTimeout(this.watchdog);
@@ -190,12 +197,33 @@ export class Cast {
         if (this.active) toast('No response', `${name} hasn’t started playing. It fetches from ${this.serverAddress()}: can it reach that address?`, 'red', 10000);
       }, 20000);
     }
+    // Starting far into a long list: the first part has to reach the start, so fewer go before it.
+    const skip = Math.max(0, index - 150);
+    items = items.slice(skip);
+    index -= skip;
+    const stubs = items.map((i, n) => (typeof i === 'string' ? { Id: i }
+      : n === 0 ? { Id: i.Id, Name: i.Name, Type: i.Type, MediaType: i.MediaType, IsFolder: i.IsFolder }
+        : { Id: i.Id, MediaType: i.MediaType }));
+    const parts = [[]];
+    let size = 0;
+    for (const s of stubs) {
+      const len = JSON.stringify(s).length + 1;
+      // The part with the starting item must hold it: startIndex counts within the first part.
+      if (size + len > PART && parts.at(-1).length && (parts.length > 1 || parts[0].length > index)) { parts.push([]); size = 0; }
+      parts.at(-1).push(s);
+      size += len;
+    }
+    const [first, ...rest] = parts;
     this.send(command, {
-      items: items.map(i => (typeof i === 'string' ? { Id: i }
-        : { Id: i.Id, ServerId: i.ServerId, Name: i.Name, Type: i.Type, MediaType: i.MediaType, IsFolder: i.IsFolder })),
+      items: first,
       startIndex: index || undefined, startPositionTicks: startTicks || undefined,
       mediaSourceId, audioStreamIndex: audioIndex, subtitleStreamIndex: subIndex,
     });
+    // Apart, so the first is playing (and its queue made) before the rest are added to it.
+    const session = this.session;
+    rest.forEach((part, n) => setTimeout(() => {
+      if (this.session === session) this.send(command === 'PlayNext' ? 'PlayNext' : 'PlayLast', { items: part });
+    }, 1500 * (n + 1)));
   }
 
   /** Play on's playstate commands; Seek is in seconds. */

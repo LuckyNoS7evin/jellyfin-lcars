@@ -157,23 +157,24 @@ export class Remote {
       for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
       index = 0;
     }
-    // The URL has to stay a sensible length; a TV won't take a 1000-track album at once anyway.
-    if (ids.length > 200) { const from = Math.max(0, Math.min(index, ids.length - 200)); ids = ids.slice(from, from + 200); index -= from; }
-    const what = items.length === 1 ? (items[0].Name || '') : `${items.length} items`;
-    const sent = () => toast(command === 'PlayNext' ? 'Playing next' : command === 'PlayLast' ? 'Added to queue' : 'Sent', `${what} → ${this.name}`, 'lilac', 2500);
+    const sent = n => toast(command === 'PlayNext' ? 'Playing next' : command === 'PlayLast' ? 'Added to queue' : 'Sent',
+      `${n === 1 ? (items[0].Name || '') : `${n} items`} → ${this.name}`, 'lilac', 2500);
     if (this.target.IsCast) {
-      // The receiver expands folders itself, so it gets the items (in the shuffled order), not just ids.
+      // The receiver keeps the whole queue and expands folders itself, so it gets every item (in
+      // the shuffled order) with its type; cast.js sends long lists in parts.
       const byId = new Map(items.filter(i => i.Id).map(i => [i.Id, i]));
       this.app.cast.play(ids.map(id => byId.get(id) || id), { command, index, startTicks, mediaSourceId, audioIndex, subIndex });
-      sent();
+      sent(ids.length);
       return;
     }
+    // The URL has to stay a sensible length; a TV won't take a 1000-track album at once anyway.
+    if (ids.length > 200) { const from = Math.max(0, Math.min(index, ids.length - 200)); ids = ids.slice(from, from + 200); index -= from; }
     try {
       await this.api.post(`/Sessions/${this.target.Id}/Playing`, undefined, {
         playCommand: command, itemIds: ids, startIndex: index || undefined, startPositionTicks: startTicks || undefined,
         mediaSourceId, audioStreamIndex: audioIndex, subtitleStreamIndex: subIndex,
       });
-      sent();
+      sent(ids.length);
     } catch (e) { this.failed(e); }
   }
 
