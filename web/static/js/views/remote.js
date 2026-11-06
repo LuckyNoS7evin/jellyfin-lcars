@@ -56,6 +56,7 @@ export async function remote(ctx) {
     }
     const note = {
       insecure: 'Needs LCARS on HTTPS',
+      local: 'Not from localhost: open LCARS at the server’s own address',
       loading: 'Looking for devices…',
       none: 'No Cast devices found on this network',
       failed: 'Cast didn’t start in this browser',

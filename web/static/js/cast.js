@@ -22,7 +22,7 @@ const COMMANDS = ['SetVolume', 'ToggleMute', 'SetAudioStreamIndex', 'SetSubtitle
 export class Cast {
   constructor(app) {
     this.app = app;
-    /** unsupported | insecure | loading | none (no devices) | available | failed */
+    /** unsupported | insecure | local | loading | none (no devices) | available | failed */
     this.status = 'unsupported';
     this.session = null;
     this.target = null;  // the pseudo-session handed to Play on
@@ -38,6 +38,8 @@ export class Cast {
     this.started = true;
     if (!window.chrome || native.present || desktopApp() || /Web0S|webOS|SmartTV|Tizen/i.test(navigator.userAgent)) return;
     if (!window.isSecureContext) { this.set('insecure'); return; }
+    // The device fetches from the server itself; "localhost" would be the device.
+    if (/^(localhost|127\.|\[::1\]$)/.test(new URL(this.serverAddress()).hostname)) { this.set('local'); return; }
     this.set('loading');
     try {
       await new Promise((resolve, reject) => {
@@ -144,6 +146,7 @@ export class Cast {
     if (!d?.ItemId) return;
     // A stop is followed by the next item's start when the queue moves on.
     t.NowPlayingItem = msg.type === 'playbackstop' ? null : images(d.NowPlayingItem || { Id: d.ItemId });
+    if (msg.type !== 'playbackstop') clearTimeout(this.watchdog);
     t.PlayState = { ...(d.PlayState || {}), ...this.volume() };
     this.remote.seenAt = Date.now();
     this.remote.emit();
@@ -179,6 +182,14 @@ export class Cast {
 
   /** PlayNow, PlayNext or PlayLast. The receiver fetches the items; it needs to know folders. */
   play(items, { command = 'PlayNow', index = 0, startTicks, mediaSourceId, audioIndex, subIndex } = {}) {
+    // Nothing comes back when the device can't reach the server; say so rather than sit silent.
+    clearTimeout(this.watchdog);
+    if (command === 'PlayNow') {
+      const name = this.target?.DeviceName || 'The Cast device';
+      this.watchdog = setTimeout(() => {
+        if (this.active) toast('No response', `${name} hasn’t started playing. It fetches from ${this.serverAddress()}: can it reach that address?`, 'red', 10000);
+      }, 20000);
+    }
     this.send(command, {
       items: items.map(i => (typeof i === 'string' ? { Id: i }
         : { Id: i.Id, ServerId: i.ServerId, Name: i.Name, Type: i.Type, MediaType: i.MediaType, IsFolder: i.IsFolder })),
