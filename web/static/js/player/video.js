@@ -371,9 +371,10 @@ export function playVideo(app, item, opts = {}) {
     let carrySource;
     if (carry && !introIds.has(cur.Id)) {
       const prev = carry;
-      carry = null;
       const src = (await fullP)?.MediaSources?.[0];
+      // Kept until a load gets this far: one that's overtaken leaves it for the next.
       if (token !== loadToken || closed) return;
+      carry = null;
       if (src?.MediaStreams) {
         const cfg = app.us.config || {};
         const a = cfg.RememberAudioSelections !== false ? matchTrack(prev, prev.audioIndex, src.MediaStreams, 'Audio') : undefined;
@@ -855,10 +856,16 @@ export function playVideo(app, item, opts = {}) {
     go(list[listIndex]);
   }
 
+  // Auto-skipped credits, Up Next and the end of the file can all ask for the next item while
+  // the first ask is still stopping this one (playback keeps ticking): only the first goes.
+  let going = false;
   async function go(next) {
-    if (!askEl.hidden) return; // already asking "Are you still watching?"
-    if (reporter) { await reporter.stop(); reporter = null; }
-    if (!sync && !(await stillWatching(next))) { close(); return; }
+    if (!askEl.hidden || going) return; // already asking "Are you still watching?", or moving on
+    going = true;
+    try {
+      if (reporter) { await reporter.stop(); reporter = null; }
+      if (!sync && !(await stillWatching(next))) { close(); return; }
+    } finally { going = false; }
     if (closed) return;
     // Intros pass the main item's choices on to whatever follows them.
     if (ms && !introIds.has(cur.Id)) carry = { streams: ms.MediaStreams, audioIndex, subIndex, secIndex };
