@@ -1,4 +1,4 @@
-// The book reader overlay: comics (cbz), PDFs and EPUBs, in the player's LCARS frame. Turn pages
+// The book reader overlay: comics (cbz, cbt), PDFs and EPUBs, in the player's LCARS frame. Turn pages
 // with the arrow keys, a click or tap on either side, a swipe, or the wheel; the middle of the
 // page shows and hides the controls. Progress goes to Jellyfin on every page turn.
 import { h, fill } from '../h.js';
@@ -6,15 +6,19 @@ import { TICKS, randomId } from '../api.js';
 import { btn, arrow, tag, toast } from '../ui.js';
 import { Reporter } from '../player/report.js';
 import { RemoteZip } from './zip.js';
+import { RemoteTar } from './tar.js';
 import { comicEngine } from './comic.js';
 import { epubEngine } from './epub.js';
 import { bookSeries, nextVolume } from '../books.js';
 
-// zip: the book is a zip read with Range requests (whole: fetched in one go below that size).
+// zip: the book is a zip read with Range requests (whole: fetched in one go below that size);
+// tar: fetched whole (no index to read from the end).
 // PDFs bring pdf.js, which does its own ranges, only when one is opened.
 const FORMATS = {
   cbz: { zip: true, make: comicEngine },
   zip: { zip: true, make: comicEngine },
+  cbt: { tar: true, make: comicEngine },
+  tar: { tar: true, make: comicEngine },
   epub: { zip: true, whole: 64 << 20, make: epubEngine },
   pdf: { make: ctx => import('./pdf.js').then(m => m.pdfEngine(ctx)) },
 };
@@ -100,12 +104,14 @@ export function openReader(app, item, opts = {}) {
       const fmt = FORMATS[ext];
       if (!fmt) throw new Error(`${ext ? ext.toUpperCase() : 'This'} books can't be opened here yet`);
       const url = api.url(`/Items/${cur.Id}/File`, {}, { auth: true });
-      const zip = fmt.zip ? await new RemoteZip(url, { signal: ac.signal, wholeBelow: fmt.whole || 0 }).open() : null;
+      const zip = fmt.zip ? await new RemoteZip(url, { signal: ac.signal, wholeBelow: fmt.whole || 0 }).open()
+        : fmt.tar ? await new RemoteTar(url, { signal: ac.signal, onProgress: f => setStatus(`Accessing archive ${Math.floor(f * 100)}%`, true) }).open()
+          : null;
       if (closed) return;
       const ud = cur.UserData || {};
       const startTicks = opts.startTicks ?? (opts.fromStart || ud.Played ? 0 : ud.PlaybackPositionTicks || 0);
       setStatus('');
-      engine = await fmt.make({ app, zip, url, signal: ac.signal, stage, item: cur, startTicks, onChange: changed, menu });
+      engine = await fmt.make({ app, zip, url, format: ext.toUpperCase(), signal: ac.signal, stage, item: cur, startTicks, onChange: changed, menu });
       if (closed) { engine.destroy(); return; }
       reporter = new Reporter(api, { itemId: cur.Id, mediaSourceId: cur.Id, playSessionId: randomId(), playMethod: 'DirectPlay' },
         () => ({ position: engine.ticks() / TICKS, paused: false }));

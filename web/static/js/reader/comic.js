@@ -9,7 +9,7 @@ const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'bas
 // Progress is the page index, as the official comics player reports it (ms × 10 000 ticks).
 const PAGE_TICKS = 10000;
 
-/** A cbz: its images in name order, and ComicInfo.xml's word on whether it's manga. */
+/** A cbz or cbt: its images in name order, and ComicInfo.xml's word on whether it's manga. */
 export async function comicEngine(ctx) {
   const { zip } = ctx;
   const pages = zip.entries
@@ -26,7 +26,7 @@ export async function comicEngine(ctx) {
   }
   return pagedEngine(ctx, {
     n: pages.length,
-    format: 'CBZ',
+    format: ctx.format || 'CBZ',
     manga,
     blob: i => zip.blob(pages[i]),
   });
