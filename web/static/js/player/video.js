@@ -112,6 +112,7 @@ export function playVideo(app, item, opts = {}) {
   let loadToken = 0;
   let showRemaining = app.us.local('timeRemaining', true); // right-hand time: remaining or total
   let secIndex = null;      // secondary subtitle (browser only)
+  let carry = null;         // the last item's tracks, for the next one (official autoSetNextTracks)
   let statsTimer = null;
   let session = null;       // this device's server session, for the info overlay
   // "Are you still watching?" (official stillWatching plugin): since the player opened or the
@@ -366,6 +367,25 @@ export function playVideo(app, item, opts = {}) {
     eng.stop();
     let info;
     const fullP = full?.Id === cur.Id ? Promise.resolve(full) : api.item(cur.Id).catch(() => cur);
+    // Moving on from another item: its audio and subtitle choices, matched to this one's tracks.
+    let carrySource;
+    if (carry && !introIds.has(cur.Id)) {
+      const prev = carry;
+      carry = null;
+      const src = (await fullP)?.MediaSources?.[0];
+      if (token !== loadToken || closed) return;
+      if (src?.MediaStreams) {
+        const cfg = app.us.config || {};
+        const a = cfg.RememberAudioSelections !== false ? matchTrack(prev, prev.audioIndex, src.MediaStreams, 'Audio') : undefined;
+        const s = cfg.RememberSubtitleSelections !== false ? matchTrack(prev, prev.subIndex, src.MediaStreams, 'Subtitle') : undefined;
+        if (a != null || s != null) carrySource = src.Id; // the indexes are this version's
+        if (a != null) audioIndex = a;
+        if (s != null) subIndex = s;
+        const s2 = cfg.RememberSubtitleSelections !== false && prev.secIndex != null
+          ? matchTrack(prev, prev.secIndex, src.MediaStreams, 'Subtitle') : undefined;
+        if (s2 != null && s2 >= 0 && s2 !== subIndex) secIndex = s2;
+      }
+    }
     // Auto: the limit the connection test found (none at home).
     const cap = maxBitrate || await autoBitrate(api).catch(() => 0) || undefined;
     if (token !== loadToken || closed) return;
@@ -374,7 +394,7 @@ export function playVideo(app, item, opts = {}) {
         profile: eng.profile({ maxBitrate: cap, burnIn: burnAll }),
         maxBitrate: cap,
         // The version picked on the title page (for that item, not its intros), then the same one on reloads.
-        mediaSourceId: ms?.Id || (cur.Id === item.Id ? wantSource : undefined),
+        mediaSourceId: ms?.Id || carrySource || (cur.Id === item.Id ? wantSource : undefined),
         audioIndex, subIndex,
         directPlay: !forceTranscode && videoIndex == null,
         alwaysBurnIn: pb.alwaysBurnInWhenTranscoding,
@@ -840,6 +860,8 @@ export function playVideo(app, item, opts = {}) {
     if (reporter) { await reporter.stop(); reporter = null; }
     if (!sync && !(await stillWatching(next))) { close(); return; }
     if (closed) return;
+    // Intros pass the main item's choices on to whatever follows them.
+    if (ms && !introIds.has(cur.Id)) carry = { streams: ms.MediaStreams, audioIndex, subIndex, secIndex };
     cur = next;
     burnAll = false;
     secIndex = null;
@@ -1111,4 +1133,30 @@ export function playVideo(app, item, opts = {}) {
     syncOff() { sync = null; drawInfo(); drawButtons(); },
   };
   return ctl;
+}
+
+/**
+ * The track in `streams` that best matches the previous item's track `prevIndex` (official
+ * rankStreamType): language and title count 2, codec and position among its kind 1, and 3 is
+ * needed. -1 (subtitles off) stays off; undefined leaves the server's default.
+ */
+function matchTrack(prev, prevIndex, streams, type) {
+  if (prevIndex == null) return undefined;
+  if (prevIndex === -1) return type === 'Subtitle' ? -1 : undefined;
+  const ofType = list => (list || []).filter(x => x.Type === type);
+  const before = ofType(prev.streams);
+  const p = before.find(x => x.Index === prevIndex);
+  if (!p) return undefined;
+  const rel = before.indexOf(p);
+  let best;
+  let bestScore = 2;
+  ofType(streams).forEach((x, i) => {
+    let score = 0;
+    if (p.Codec === x.Codec) score += 1;
+    if (rel === i) score += 1;
+    if (p.DisplayTitle && p.DisplayTitle === x.DisplayTitle) score += 2;
+    if (p.Language && p.Language !== 'und' && p.Language === x.Language) score += 2;
+    if (score > bestScore) { bestScore = score; best = x.Index; }
+  });
+  return best;
 }
